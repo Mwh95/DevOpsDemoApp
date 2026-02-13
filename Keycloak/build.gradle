@@ -1,0 +1,24 @@
+plugins {
+    id 'base'
+}
+
+description = 'Keycloak Authentication Service'
+
+task buildDockerImage(type: Exec) {
+    description = 'Build Keycloak Docker image'
+    group = 'docker'
+    workingDir project.projectDir
+    commandLine 'docker', 'build', '-t', "keycloak:${project.version}", '.'
+}
+
+task pushDockerImage(type: Exec) {
+    description = 'Push Keycloak Docker image to registry'
+    group = 'docker'
+    dependsOn buildDockerImage
+    workingDir project.projectDir
+    commandLine 'docker', 'push', "keycloak:${project.version}"
+}
+
+build {
+    dependsOn buildDockerImage
+}

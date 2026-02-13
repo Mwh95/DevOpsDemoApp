@@ -1,0 +1,24 @@
+plugins {
+    id 'base'
+}
+
+description = 'Apache HTTPD Reverse Proxy'
+
+task buildDockerImage(type: Exec) {
+    description = 'Build Reverse Proxy Docker image'
+    group = 'docker'
+    workingDir project.projectDir
+    commandLine 'docker', 'build', '-t', "reverse-proxy:${project.version}", '.'
+}
+
+task pushDockerImage(type: Exec) {
+    description = 'Push Reverse Proxy Docker image to registry'
+    group = 'docker'
+    dependsOn buildDockerImage
+    workingDir project.projectDir
+    commandLine 'docker', 'push', "reverse-proxy:${project.version}"
+}
+
+build {
+    dependsOn buildDockerImage
+}

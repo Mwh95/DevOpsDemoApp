@@ -114,6 +114,6 @@ metadata:
 type: Opaque
 stringData:
   admin-username: "admin"
-  admin-password: "CHANGE_ME"
+  admin-password: "CHANGE_ME_BEFORE_DEPLOYMENT"  # ⚠️ MUST be changed before deployment
   db-username: "keycloak"
-  db-password: "CHANGE_ME"
+  db-password: "CHANGE_ME_BEFORE_DEPLOYMENT"     # ⚠️ MUST be changed before deployment

@@ -27,7 +27,7 @@ kubectl cluster-info
 ### Option 1: Using Deployment Script (Recommended)
 
 ```bash
-# Clone the repository
+# Clone the repository (or navigate to your existing clone)
 git clone https://github.com/Mwh95/PlaygroundApp.git
 cd PlaygroundApp
 

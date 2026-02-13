@@ -19,3 +19,19 @@ gradle-app.setting
 .project
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
+
+# Docker volumes and data
+**/postgres-data/
+**/.docker/
+
+# Backup files from deployment scripts
+*.bak
+
+# IDE files
+.idea/
+.vscode/
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,15 @@
+# Ignore git directory
+.git
+.gitignore
+
+# Ignore gradle build artifacts
+.gradle
+build
+**/build/
+
+# Ignore IDE files
+.idea
+.vscode
+*.iml
+.project
+.classpath

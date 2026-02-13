@@ -1,6 +1,6 @@
 # PlaygroundApp
 
-A multi-service application with Keycloak authentication, Apache reverse proxy, and PostgreSQL database, deployable on both local Kubernetes and GCP.
+A multi-service application with Keycloak authentication, Kubernetes Ingress routing, and PostgreSQL database, deployable on both local Kubernetes and GCP.
 
 ## Project Structure
 
@@ -12,24 +12,21 @@ PlaygroundApp/
 │   └── k8s/            # Kubernetes manifests
 │       ├── local/
 │       └── gcp/
-├── ReverseProxy/       # Apache HTTPD reverse proxy
-│   ├── Dockerfile
-│   ├── build.gradle
-│   ├── config/         # Apache configuration
-│   └── k8s/            # Kubernetes manifests
-│       ├── local/
-│       └── gcp/
+├── k8s/                # Ingress manifests
+│   ├── local/          # Local Ingress (ingress-nginx)
+│   └── gcp/            # GKE Ingress
 ├── Database/           # PostgreSQL database
 │   ├── docker-compose.yml
 │   ├── build.gradle
 │   └── config/         # Database initialization scripts
+├── docs/               # Runbooks (e.g. GKE Ingress via Console)
 └── scripts/            # Deployment automation scripts
 ```
 
 ## Features
 
 - **Keycloak**: Authentication and authorization service (2 replicas in K8s)
-- **Reverse Proxy**: Apache HTTPD acting as reverse proxy (2 replicas in K8s)
+- **Ingress**: Kubernetes Ingress for routing (ingress-nginx locally, GKE Ingress on GCP)
 - **Database**: PostgreSQL for data persistence
 - **Multi-environment**: Supports both local development and GCP deployment
 - **Gradle Integration**: All projects use Gradle for build automation
@@ -65,13 +62,13 @@ PlaygroundApp/
    ```
 
 3. **Access the services:**
-   - Reverse Proxy: http://localhost:80
-   - Keycloak: http://localhost:80/auth
-   - Admin Console: http://localhost:80/auth/admin (admin/admin)
+   - Get the NodePort: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
+   - Keycloak: http://localhost:NODEPORT/auth (use the HTTP NodePort from the command above)
+   - Admin Console: http://localhost:NODEPORT/auth/admin (admin/admin)
 
 4. **Check status:**
    ```bash
-   kubectl get pods,svc
+   kubectl get pods,svc && kubectl get ingress
    ```
 
 5. **Cleanup:**
@@ -100,9 +97,9 @@ PlaygroundApp/
    ./scripts/deploy-gcp.sh
    ```
 
-5. **Get external IP:**
+5. **Get Ingress address:**
    ```bash
-   kubectl get svc reverse-proxy
+   kubectl get ingress playground-ingress
    ```
 
 ## Building Individual Components
@@ -110,11 +107,6 @@ PlaygroundApp/
 ### Keycloak
 ```bash
 ./gradlew :Keycloak:buildDockerImage
-```
-
-### Reverse Proxy
-```bash
-./gradlew :ReverseProxy:buildDockerImage
 ```
 
 ### Database (Local)
@@ -128,14 +120,13 @@ PlaygroundApp/
 ### Local Environment
 - PostgreSQL runs as Docker container (docker-compose)
 - Keycloak connects to local PostgreSQL
-- Reverse Proxy routes traffic to Keycloak
+- Ingress (ingress-nginx) routes traffic to Keycloak at /auth
 - All services deployed to local Kubernetes cluster
 
 ### GCP Environment
 - PostgreSQL on Cloud SQL (recommended)
-- Keycloak and Reverse Proxy on GKE
+- Keycloak on GKE; GKE Ingress provides load balancer and routing
 - 2 replicas for high availability
-- Load balancer for external access
 - Secrets managed via Kubernetes Secrets
 - Images stored in Google Container Registry
 
@@ -147,10 +138,9 @@ PlaygroundApp/
 - Ports: 8080 (HTTP), 8443 (HTTPS)
 - Health checks: `/health/ready`, `/health/live`
 
-### Reverse Proxy
-- Routes: `/auth` → Keycloak
-- Ports: 80 (HTTP), 443 (HTTPS)
-- Status endpoint: `/server-status`
+### Ingress
+- Local: ingress-nginx controller; path `/auth` → Keycloak (NodePort).
+- GCP: GKE Ingress; path `/auth` → Keycloak. See `docs/gke-ingress-console.md` for Console setup.
 
 ### Database
 - Engine: PostgreSQL 15
@@ -160,11 +150,8 @@ PlaygroundApp/
 
 ## Customization
 
-### Adding Routes to Reverse Proxy
-Edit `ReverseProxy/config/httpd-vhosts.conf` and rebuild:
-```bash
-./gradlew :ReverseProxy:buildDockerImage
-```
+### Adding Routes
+Edit `k8s/local/ingress.yaml` or `k8s/gcp/ingress.yaml` to add path rules and backend services, then re-apply.
 
 ### Keycloak Configuration
 Add realm export files to `Keycloak/` and update Dockerfile:
@@ -182,8 +169,8 @@ Add SQL scripts to `Database/config/init.sql`
 # Keycloak
 kubectl logs -l app=keycloak
 
-# Reverse Proxy
-kubectl logs -l app=reverse-proxy
+# Ingress controller (local)
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
 
 # Database (local)
 ./gradlew :Database:logsDb
@@ -192,7 +179,7 @@ kubectl logs -l app=reverse-proxy
 ### Port Forwarding (for testing)
 ```bash
 kubectl port-forward svc/keycloak 8080:8080
-kubectl port-forward svc/reverse-proxy 8000:80
+# Or use the Ingress NodePort: kubectl get svc -n ingress-nginx ingress-nginx-controller
 ```
 
 ## Development

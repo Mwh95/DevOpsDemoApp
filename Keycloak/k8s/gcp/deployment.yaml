@@ -14,6 +14,7 @@ spec:
       labels:
         app: keycloak
     spec:
+      automountServiceAccountToken: false
       containers:
       - name: keycloak
         image: gcr.io/PROJECT_ID/keycloak:1.0.0
@@ -56,11 +57,11 @@ spec:
               key: hostname
         - name: KC_HOSTNAME_STRICT_HTTPS
           value: "true"
+        - name: KC_HTTP_RELATIVE_PATH
+          value: "/auth"
         ports:
         - name: http
           containerPort: 8080
-        - name: https
-          containerPort: 8443
         readinessProbe:
           httpGet:
             path: /health/ready
@@ -69,7 +70,7 @@ spec:
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /health/live
+            path: /auth/health/live
             port: 8080
           initialDelaySeconds: 90
           periodSeconds: 10
@@ -77,9 +78,11 @@ spec:
           requests:
             memory: "512Mi"
             cpu: "500m"
+            ephemeral-storage: "1Gi"
           limits:
             memory: "1Gi"
             cpu: "1000m"
+            ephemeral-storage: "2Gi"
 ---
 apiVersion: v1
 kind: Service
@@ -93,9 +96,6 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
-  - name: https
-    port: 8443
-    targetPort: 8443
   selector:
     app: keycloak
 ---

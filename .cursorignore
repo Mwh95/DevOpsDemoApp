@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+vendor/
+dist/
+build/
+out/
+target/
+bin/
+obj/
+
+# Package managers
+.pnpm-store/
+.yarn/
+.yarn-cache/
+.npm/
+
+# Logs
+*.log
+logs/
+
+# Environment & secrets
+.env
+.env.*
+*.pem
+*.key
+*.cert
+secrets/
+credentials/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Coverage
+coverage/
+*.lcov
+
+# Cache
+.cache/
+.tmp/
+temp/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# Large assets
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
+*.mp4
+*.mov
+*.png
+*.jpg
+*.jpeg
+*.pdf
+
+# Database
+*.sqlite
+*.db
+
+# Generated docs
+docs/build/

@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: playground-ingress
+  labels:
+    app: playground
+  annotations:
+    # Optional: use a reserved static IP (uncomment and set after creating the address)
+    # kubernetes.io/ingress.global-static-ip-name: "playground-ingress-ip"
+    # Optional: use a managed certificate for HTTPS (uncomment and create ManagedCertificate first)
+    # networking.gke.io/managed-certificates: "playground-tls"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              number: 8080

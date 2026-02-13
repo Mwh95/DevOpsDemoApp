@@ -47,7 +47,7 @@ kubectl cluster-info
 ./gradlew buildAll
 
 # Verify images are created
-docker images | grep -E "keycloak|reverse-proxy"
+docker images | grep keycloak
 ```
 
 ### Step 3: Start Database
@@ -71,14 +71,7 @@ cd ..
 kubectl get pods -w
 ```
 
-Expected output:
-```
-NAME                             READY   STATUS    RESTARTS   AGE
-keycloak-xxxxxxxxx-xxxxx         1/1     Running   0          1m
-keycloak-xxxxxxxxx-xxxxx         1/1     Running   0          1m
-reverse-proxy-xxxxxxxxx-xxxxx    1/1     Running   0          1m
-reverse-proxy-xxxxxxxxx-xxxxx    1/1     Running   0          1m
-```
+Expected output: keycloak pods and (in namespace ingress-nginx) ingress-nginx-controller pod(s).
 
 ### Step 5: Access Services
 
@@ -88,9 +81,9 @@ kubectl get svc
 ```
 
 Access the application:
-- **Reverse Proxy**: http://localhost:80
-- **Keycloak**: http://localhost:80/auth
-- **Keycloak Admin Console**: http://localhost:80/auth/admin
+- Get NodePort: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
+- **Keycloak**: http://localhost:\<nodeport\>/auth
+- **Keycloak Admin Console**: http://localhost:\<nodeport\>/auth/admin (replace \<nodeport\> with the HTTP port from the command above)
   - Username: `admin`
   - Password: `admin`
 
@@ -102,11 +95,10 @@ kubectl get all
 
 # View logs
 kubectl logs -l app=keycloak
-kubectl logs -l app=reverse-proxy
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
 
-# Test the reverse proxy
-curl http://localhost/server-status
-curl http://localhost/auth
+# Test the Ingress (use the HTTP NodePort from ingress-nginx-controller service)
+curl http://localhost:\<nodeport\>/auth
 ```
 
 ### Cleanup Local Deployment
@@ -204,31 +196,34 @@ gcloud auth configure-docker
 ### Step 6: Deploy to GCP
 
 ```bash
-# Deploy (this will build, tag, push, and deploy)
+# Deploy (builds Keycloak image, pushes to GCR, deploys Keycloak and GKE Ingress)
 ./scripts/deploy-gcp.sh
 
 # Monitor deployment
 kubectl get pods -w
 ```
 
-### Step 7: Get External IP
+To configure or create the Ingress via Google Cloud Console, see [docs/gke-ingress-console.md](docs/gke-ingress-console.md). Optional: run `./scripts/setup-gke-ingress.sh` to enable APIs and apply Ingress with optional static IP.
+
+### Step 7: Get Ingress Address
 
 ```bash
-# Get the external IP address
-kubectl get svc reverse-proxy
+# Get the Ingress external address
+kubectl get ingress playground-ingress
 
-# Wait for EXTERNAL-IP to be assigned (may take a few minutes)
-# Then access your application at http://<EXTERNAL-IP>
+# Wait for ADDRESS to be assigned (may take a few minutes)
+# Then access your application at http://<ADDRESS>/auth
 ```
 
 ### Step 8: Configure DNS (Optional)
 
-Point your domain to the external IP:
+Point your domain to the Ingress address:
 ```bash
-# Get external IP
-EXTERNAL_IP=$(kubectl get svc reverse-proxy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+# Get Ingress address
+kubectl get ingress playground-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 
-# Create DNS A record pointing your-domain.com to $EXTERNAL_IP
+# Create DNS A record pointing your-domain.com to that IP
+# See docs/gke-ingress-console.md for HTTPS and managed certificates
 ```
 
 ### Step 9: Enable HTTPS (Production)
@@ -284,11 +279,10 @@ kubectl describe serviceaccount default
 ### Port Forwarding for Debugging
 
 ```bash
-# Forward Keycloak port
+# Forward Keycloak port directly
 kubectl port-forward svc/keycloak 8080:8080
 
-# Forward Reverse Proxy port
-kubectl port-forward svc/reverse-proxy 8000:80
+# Or use the Ingress NodePort (local): kubectl get svc -n ingress-nginx ingress-nginx-controller
 ```
 
 ---
@@ -301,9 +295,6 @@ kubectl port-forward svc/reverse-proxy 8000:80
 # Scale Keycloak
 kubectl scale deployment keycloak --replicas=3
 
-# Scale Reverse Proxy
-kubectl scale deployment reverse-proxy --replicas=3
-
 # Verify
 kubectl get pods
 ```
@@ -311,16 +302,11 @@ kubectl get pods
 ### Auto-scaling (GCP)
 
 ```bash
-# Enable horizontal pod autoscaling
+# Enable horizontal pod autoscaling for Keycloak
 kubectl autoscale deployment keycloak \
   --cpu-percent=70 \
   --min=2 \
   --max=10
-
-kubectl autoscale deployment reverse-proxy \
-  --cpu-percent=70 \
-  --min=2 \
-  --max=5
 ```
 
 ---
@@ -341,11 +327,8 @@ kubectl top pods
 # Keycloak logs
 kubectl logs -l app=keycloak --tail=100 -f
 
-# Reverse Proxy logs
-kubectl logs -l app=reverse-proxy --tail=100 -f
-
-# All logs
-kubectl logs -l 'app in (keycloak,reverse-proxy)' --tail=50
+# Ingress controller logs (local)
+kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=100 -f
 ```
 
 ---
@@ -390,7 +373,6 @@ gcloud sql backups restore <BACKUP_ID> --backup-instance=playground-db
 
 # Rolling update
 kubectl rollout restart deployment keycloak
-kubectl rollout restart deployment reverse-proxy
 
 # Check rollout status
 kubectl rollout status deployment keycloak
@@ -427,7 +409,7 @@ gcloud sql instances delete playground-db
 ## Additional Resources
 
 - [Keycloak Documentation](https://www.keycloak.org/documentation)
-- [Apache HTTPD Documentation](https://httpd.apache.org/docs/)
+- [GKE Ingress](https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [GKE Documentation](https://cloud.google.com/kubernetes-engine/docs)

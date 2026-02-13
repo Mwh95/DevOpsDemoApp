@@ -25,39 +25,28 @@ echo "Using GCP Project: $GCP_PROJECT_ID"
 echo "Building Docker images..."
 ./gradlew buildAll
 
-echo "Tagging images for GCR..."
+echo "Tagging image for GCR..."
 docker tag keycloak:1.0.0 gcr.io/$GCP_PROJECT_ID/keycloak:1.0.0
-docker tag reverse-proxy:1.0.0 gcr.io/$GCP_PROJECT_ID/reverse-proxy:1.0.0
 
-echo "Pushing images to GCR..."
+echo "Pushing image to GCR..."
 docker push gcr.io/$GCP_PROJECT_ID/keycloak:1.0.0
-docker push gcr.io/$GCP_PROJECT_ID/reverse-proxy:1.0.0
 
 # Deploy to GKE using kubectl with environment variable substitution
 echo "Deploying to GKE..."
 
-# Use temporary files to avoid modifying source files
-echo "Creating temporary deployment files..."
 export PROJECT_ID=$GCP_PROJECT_ID
 envsubst < Keycloak/k8s/gcp/deployment.yaml > /tmp/keycloak-deployment.yaml || {
-    # Fallback if envsubst is not available
     sed "s/PROJECT_ID/$GCP_PROJECT_ID/g" Keycloak/k8s/gcp/deployment.yaml > /tmp/keycloak-deployment.yaml
 }
 
-envsubst < ReverseProxy/k8s/gcp/deployment.yaml > /tmp/reverse-proxy-deployment.yaml || {
-    # Fallback if envsubst is not available
-    sed "s/PROJECT_ID/$GCP_PROJECT_ID/g" ReverseProxy/k8s/gcp/deployment.yaml > /tmp/reverse-proxy-deployment.yaml
-}
-
-# Apply the temporary files
 kubectl apply -f /tmp/keycloak-deployment.yaml
-kubectl apply -f /tmp/reverse-proxy-deployment.yaml
+rm -f /tmp/keycloak-deployment.yaml
 
-# Clean up temporary files
-rm -f /tmp/keycloak-deployment.yaml /tmp/reverse-proxy-deployment.yaml
+echo "Applying GKE Ingress..."
+kubectl apply -f k8s/gcp/ingress.yaml
 
 echo ""
 echo "Deployment complete!"
 echo ""
-echo "Check status with: kubectl get pods,svc"
-echo "Get external IP: kubectl get svc reverse-proxy"
+echo "Check status: kubectl get pods,svc"
+echo "Get Ingress address: kubectl get ingress playground-ingress"

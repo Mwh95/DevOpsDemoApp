@@ -39,8 +39,9 @@ kubectl get pods -w
 ```
 
 **Access the application:**
-- Keycloak Admin: http://localhost/auth/admin (admin/admin)
-- API endpoint: http://localhost/auth
+- Get NodePort: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
+- Keycloak Admin: http://localhost:NODEPORT/auth/admin (admin/admin; replace NODEPORT with the HTTP port)
+- API endpoint: http://localhost:NODEPORT/auth
 
 ### Option 2: Step-by-Step
 
@@ -53,14 +54,13 @@ kubectl get pods -w
 
 # 3. Deploy to Kubernetes
 kubectl apply -f Keycloak/k8s/local/deployment.yaml
-kubectl apply -f ReverseProxy/k8s/local/deployment.yaml
+./scripts/setup-local-ingress.sh
 
 # 4. Wait for ready status
 kubectl wait --for=condition=ready pod -l app=keycloak --timeout=120s
-kubectl wait --for=condition=ready pod -l app=reverse-proxy --timeout=60s
 
-# 5. Access the application
-open http://localhost/auth/admin
+# 5. Access the application (use NodePort from: kubectl get svc -n ingress-nginx ingress-nginx-controller)
+open http://localhost:NODEPORT/auth/admin
 ```
 
 ## Verify Installation
@@ -69,16 +69,10 @@ open http://localhost/auth/admin
 # Check all services are running
 kubectl get pods,svc
 
-# Expected output:
-# NAME                                READY   STATUS    RESTARTS   AGE
-# pod/keycloak-xxx-xxx                1/1     Running   0          2m
-# pod/keycloak-xxx-xxx                1/1     Running   0          2m
-# pod/reverse-proxy-xxx-xxx           1/1     Running   0          2m
-# pod/reverse-proxy-xxx-xxx           1/1     Running   0          2m
+# Expected output: keycloak pods and (in ingress-nginx namespace) ingress-nginx-controller
 
-# Test the endpoints
-curl http://localhost/server-status
-curl http://localhost/auth
+# Test the endpoints (replace NODEPORT with the HTTP port from ingress-nginx-controller service)
+curl http://localhost:NODEPORT/auth
 
 # View logs if needed
 kubectl logs -l app=keycloak --tail=20
@@ -107,12 +101,8 @@ docker ps | grep postgres
 
 ### Port already in use?
 ```bash
-# Check what's using port 80
-lsof -i :80
-
-# Or change the service type to NodePort
-kubectl patch svc reverse-proxy -p '{"spec":{"type":"NodePort"}}'
-kubectl get svc reverse-proxy  # Check the assigned port
+# Ingress controller uses NodePort by default; get the port:
+kubectl get svc -n ingress-nginx ingress-nginx-controller
 ```
 
 ## Clean Up
@@ -122,8 +112,9 @@ kubectl get svc reverse-proxy  # Check the assigned port
 ./scripts/cleanup-local.sh
 
 # Or manually:
-kubectl delete -f ReverseProxy/k8s/local/deployment.yaml
+kubectl delete -f k8s/local/ingress.yaml
 kubectl delete -f Keycloak/k8s/local/deployment.yaml
+kubectl delete namespace ingress-nginx
 ./gradlew :Database:stopLocalDb
 ```
 

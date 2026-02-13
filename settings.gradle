@@ -1,0 +1,5 @@
+rootProject.name = 'PlaygroundApp'
+
+include 'Keycloak'
+include 'ReverseProxy'
+include 'Database'

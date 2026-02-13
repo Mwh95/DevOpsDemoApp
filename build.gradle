@@ -1,0 +1,28 @@
+plugins {
+    id 'base'
+}
+
+allprojects {
+    group = 'com.playground'
+    version = '1.0.0'
+}
+
+subprojects {
+    apply plugin: 'base'
+    
+    repositories {
+        mavenCentral()
+    }
+}
+
+task buildAll {
+    dependsOn subprojects*.tasks*.findByName('build')
+    description = 'Build all projects'
+    group = 'build'
+}
+
+task cleanAll {
+    dependsOn subprojects*.tasks*.findByName('clean')
+    description = 'Clean all projects'
+    group = 'build'
+}

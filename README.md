@@ -1,35 +1,36 @@
-# PlaygroundApp
+# DemoApp
 
 A multi-service application with Keycloak authentication, Kubernetes Ingress routing, and PostgreSQL database, deployable on both local Kubernetes and GCP.
 
 ## Project Structure
 
 ```
-PlaygroundApp/
+DemoApp/
 ├── Keycloak/           # Keycloak authentication service
 │   ├── Dockerfile
-│   ├── build.gradle
 │   └── k8s/            # Kubernetes manifests
 │       ├── local/
-│       └── gcp/
-├── k8s/                # Ingress manifests
+├── k8s/                # Ingress manifests (shared)
 │   ├── local/          # Local Ingress (ingress-nginx)
-│   └── gcp/            # GKE Ingress
-├── Database/           # PostgreSQL database
+├── Database/           # PostgreSQL (Docker Compose locally; Cloud SQL on GCP)
 │   ├── docker-compose.yml
-│   ├── build.gradle
-│   └── config/         # Database initialization scripts
+│   └── config/         # Database initialization scripts (e.g. init.sql)
 ├── docs/               # Runbooks (e.g. GKE Ingress via Console)
 └── scripts/            # Deployment automation scripts
 ```
 
+## Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** — Get running in 5 minutes (local).
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** — Full deployment guide (local).
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — System design and components.
+
 ## Features
 
 - **Keycloak**: Authentication and authorization service (2 replicas in K8s)
-- **Ingress**: Kubernetes Ingress for routing (ingress-nginx locally, GKE Ingress on GCP)
+- **Ingress**: Kubernetes Ingress for routing (ingress-nginx locally)
 - **Database**: PostgreSQL for data persistence
 - **Multi-environment**: Supports both local development and GCP deployment
-- **Gradle Integration**: All projects use Gradle for build automation
 - **Container-first**: All services are containerized with Docker
 - **Kubernetes Ready**: Complete K8s manifests for orchestration
 
@@ -39,91 +40,90 @@ PlaygroundApp/
 - Docker and Docker Compose
 - Kubernetes (Docker Desktop, Minikube, or Kind)
 - kubectl
-- Gradle 8.5+ (or use included wrapper: `./gradlew`)
-
-### GCP Deployment
-- Google Cloud SDK (`gcloud`)
-- GKE cluster
-- Docker registry access (GCR)
-- kubectl configured for GKE
 
 ## Quick Start
 
 ### Local Deployment
 
-1. **Build all projects:**
-   ```bash
-   ./gradlew buildAll
-   ```
+1. Start a local Kubernetes cluster.
 
-2. **Deploy to local Kubernetes:**
-   ```bash
-   ./scripts/deploy-local.sh
-   ```
+2. Deploy the local stack from the repository root:
 
-3. **Access the services:**
-   - Get the NodePort: `kubectl get svc -n ingress-nginx ingress-nginx-controller`
-   - Keycloak: http://localhost:NODEPORT/auth (use the HTTP NodePort from the command above)
-   - Admin Console: http://localhost:NODEPORT/auth/admin (admin/admin)
+```bash
+./scripts/deploy-local.sh
+```
 
-4. **Check status:**
+3. Run port-forwarding to ingress on port `50594` in a separate shell:
+```shell
+kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 50594:80
+```
+
+4. Wait for pods to be ready, then access the services:
+   - Map app: `http://localhost:50594/`
+   - Map API: `http://localhost:50594/api`
+   - Keycloak: `http://localhost:50594/login`
+   - Admin Console: `http://127.0.0.1:50594/login/admin`
+
+5. Check status:
    ```bash
    kubectl get pods,svc && kubectl get ingress
    ```
 
-5. **Cleanup:**
+6. Cleanup:
    ```bash
    ./scripts/cleanup-local.sh
    ```
 
-### GCP Deployment
+For step-by-step instructions and troubleshooting, see [QUICKSTART.md](QUICKSTART.md).
 
-1. **Set your GCP project:**
+### DRAFT: GCP Deployment
+
+1. **Set your GCP project and configure kubectl for GKE:**
    ```bash
    export GCP_PROJECT_ID=your-gcp-project-id
-   ```
-
-2. **Configure kubectl for GKE:**
-   ```bash
    gcloud container clusters get-credentials your-cluster-name --region your-region
    ```
 
-3. **Update secrets in deployment files:**
-   - Edit `Keycloak/k8s/gcp/deployment.yaml`
-   - Update passwords and database connection strings
+2. **Update secrets** in `Keycloak/k8s/gcp/deployment.yaml`:
+   - Replace placeholder passwords (e.g. `CHANGE_ME_BEFORE_DEPLOYMENT`) with secure values.
+   - Set database connection (e.g. Cloud SQL) and hostname as needed.  
+   The deploy script will refuse to run if placeholders are still present.
 
-4. **Deploy to GCP:**
+3. **Deploy to GCP** (builds image, pushes to GCR, deploys Keycloak and GKE Ingress):
    ```bash
    ./scripts/deploy-gcp.sh
    ```
 
-5. **Get Ingress address:**
+4. **Get Ingress address:**
    ```bash
-   kubectl get ingress playground-ingress
+   kubectl get ingress demoapp-ingress
    ```
+   Optional: run `./scripts/setup-gke-ingress.sh` for APIs and Ingress with optional static IP. For Console-based setup, see [docs/gke-ingress-console.md](docs/gke-ingress-console.md).
+
+For full GCP steps (cluster, Cloud SQL, secrets, HTTPS), see [DEPLOYMENT.md](DEPLOYMENT.md#gcp-deployment).
 
 ## Building Individual Components
 
 ### Keycloak
 ```bash
-./gradlew :Keycloak:buildDockerImage
+docker build -t keycloak:1.0.0 Keycloak/
 ```
 
 ### Database (Local)
 ```bash
-./gradlew :Database:startLocalDb
-./gradlew :Database:stopLocalDb
+cd Database && docker compose up -d
 ```
+See [Database/README.md](Database/README.md) for details.
 
 ## Architecture
 
 ### Local Environment
-- PostgreSQL runs as Docker container (docker-compose)
-- Keycloak connects to local PostgreSQL
-- Ingress (ingress-nginx) routes traffic to Keycloak at /auth
-- All services deployed to local Kubernetes cluster
+- PostgreSQL runs via Docker Compose (`Database/docker-compose.yml`); not deployed to Kubernetes.
+- Keycloak runs in Kubernetes and connects to the local PostgreSQL (host from cluster).
+- Ingress (ingress-nginx) is installed by `scripts/setup-local-ingress.sh` and routes `/auth` to Keycloak.
+- Access: http://localhost:\<nodeport\>/auth (nodeport from `kubectl get svc -n ingress-nginx ingress-nginx-controller`).
 
-### GCP Environment
+### DRAFT: GCP Environment
 - PostgreSQL on Cloud SQL (recommended)
 - Keycloak on GKE; GKE Ingress provides load balancer and routing
 - 2 replicas for high availability
@@ -133,20 +133,20 @@ PlaygroundApp/
 ## Configuration
 
 ### Keycloak
-- Default admin: `admin/admin` (local)
+- Default admin: `tmpadmin/admin` (local)
 - Database: PostgreSQL
 - Ports: 8080 (HTTP), 8443 (HTTPS)
-- Health checks: `/health/ready`, `/health/live`
+- Health checks (with context path `/auth`): `/auth/health/ready`, `/auth/health/live`
 
 ### Ingress
 - Local: ingress-nginx controller; path `/auth` → Keycloak (NodePort).
 - GCP: GKE Ingress; path `/auth` → Keycloak. See `docs/gke-ingress-console.md` for Console setup.
 
 ### Database
-- Engine: PostgreSQL 15
+- Engine: PostgreSQL 18.2
 - Port: 5432
-- Default database: `keycloak`
-- Default user: `keycloak/keycloak` (⚠️ change for production)
+- Default database: `MapMarkerDb` (Keycloak and MapService each use a dedicated user and schema)
+- Bootstrap user: `postgres/postgres` (init only); runtime: `keycloak` (schema keycloak), `mapservice` (schema mapservice)
 
 ## Customization
 
@@ -160,7 +160,7 @@ COPY realm-export.json /opt/keycloak/data/import/
 ```
 
 ### Database Initialization
-Add SQL scripts to `Database/config/init.sql`
+Add bootstrap changelogs to `Liquibase/modules/database/bootstrap/changelog.xml`
 
 ## Monitoring and Troubleshooting
 
@@ -173,7 +173,7 @@ kubectl logs -l app=keycloak
 kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
 
 # Database (local)
-./gradlew :Database:logsDb
+docker logs <container-id>
 ```
 
 ### Port Forwarding (for testing)
@@ -184,17 +184,13 @@ kubectl port-forward svc/keycloak 8080:8080
 
 ## Development
 
-### Project Tasks
-```bash
-# List all tasks
-./gradlew tasks
+- Build Keycloak: `docker build -t keycloak:1.0.0 Keycloak/`
+- Build Map API: `docker build -t map-api:dev MapService/`
+- Build Map Frontend: `docker build -t map-frontend:dev MapFrontend/`
+- Build Liquibase: `docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`
+- Deploy locally: `./scripts/deploy-local.sh`; cleanup: `./scripts/cleanup-local.sh`
 
-# Build all projects
-./gradlew buildAll
-
-# Clean all projects
-./gradlew cleanAll
-```
+For more commands and troubleshooting, see [QUICKSTART.md](QUICKSTART.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## License
 

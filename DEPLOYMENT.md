@@ -8,7 +8,6 @@ Before deploying the application, ensure you have the following installed:
 - Docker (20.10+)
 - Docker Compose (2.0+)
 - kubectl (1.24+)
-- Gradle 8.5+ (or use `./gradlew`)
 
 ### For Local Deployment
 - Local Kubernetes cluster:
@@ -43,8 +42,8 @@ kubectl cluster-info
 ### Step 2: Build Docker Images
 
 ```bash
-# Build all Docker images
-./gradlew buildAll
+# Build Keycloak Docker image
+docker build -t keycloak:1.0.0 Keycloak/
 
 # Verify images are created
 docker images | grep keycloak
@@ -131,7 +130,7 @@ gcloud services enable sqladmin.googleapis.com
 
 ```bash
 # Create a GKE cluster (if not already created)
-gcloud container clusters create playground-cluster \
+gcloud container clusters create demoapp-cluster \
   --zone us-central1-a \
   --num-nodes 2 \
   --machine-type n1-standard-2 \
@@ -140,7 +139,7 @@ gcloud container clusters create playground-cluster \
   --max-nodes 4
 
 # Get credentials
-gcloud container clusters get-credentials playground-cluster \
+gcloud container clusters get-credentials demoapp-cluster \
   --zone us-central1-a
 ```
 
@@ -148,21 +147,21 @@ gcloud container clusters get-credentials playground-cluster \
 
 ```bash
 # Create PostgreSQL instance
-gcloud sql instances create playground-db \
+gcloud sql instances create demoapp-db \
   --database-version=POSTGRES_15 \
   --tier=db-f1-micro \
   --region=us-central1
 
 # Create database
-gcloud sql databases create keycloak --instance=playground-db
+gcloud sql databases create MapMarkerDb --instance=demoapp-db
 
-# Create user
-gcloud sql users create keycloak \
-  --instance=playground-db \
+# Create user (optional; Cloud SQL often has default postgres). Then run Liquibase/modules/database/bootstrap/changelog.xml as instance admin to create keycloak and mapservice users/schemas in MapMarkerDb.
+gcloud sql users create postgres \
+  --instance=demoapp-db \
   --password=YOUR_SECURE_PASSWORD
 
 # Get connection name
-gcloud sql instances describe playground-db \
+gcloud sql instances describe demoapp-db \
   --format="value(connectionName)"
 ```
 
@@ -182,7 +181,7 @@ stringData:
 **Database connection** (`Keycloak/k8s/gcp/deployment.yaml`):
 ```yaml
 data:
-  db-url: "jdbc:postgresql://CLOUD_SQL_CONNECTION_NAME/keycloak"
+  db-url: "jdbc:postgresql://CLOUD_SQL_CONNECTION_NAME/MapMarkerDb?currentSchema=keycloak"
   hostname: "your-domain.com"  # Update with your actual domain
 ```
 
@@ -209,7 +208,7 @@ To configure or create the Ingress via Google Cloud Console, see [docs/gke-ingre
 
 ```bash
 # Get the Ingress external address
-kubectl get ingress playground-ingress
+kubectl get ingress demoapp-ingress
 
 # Wait for ADDRESS to be assigned (may take a few minutes)
 # Then access your application at http://<ADDRESS>/auth
@@ -220,7 +219,7 @@ kubectl get ingress playground-ingress
 Point your domain to the Ingress address:
 ```bash
 # Get Ingress address
-kubectl get ingress playground-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+kubectl get ingress demoapp-ingress -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
 
 # Create DNS A record pointing your-domain.com to that IP
 # See docs/gke-ingress-console.md for HTTPS and managed certificates
@@ -232,7 +231,7 @@ For production, you should enable HTTPS:
 
 1. Create a Google-managed SSL certificate:
 ```bash
-gcloud compute ssl-certificates create playground-cert \
+gcloud compute ssl-certificates create demoapp-cert \
   --domains=your-domain.com
 ```
 
@@ -345,7 +344,7 @@ docker-compose exec postgres pg_dump -U keycloak keycloak > backup.sql
 ### Backup Database (GCP Cloud SQL)
 
 ```bash
-gcloud sql backups create --instance=playground-db
+gcloud sql backups create --instance=demoapp-db
 ```
 
 ### Restore Database
@@ -355,7 +354,7 @@ gcloud sql backups create --instance=playground-db
 docker-compose exec -T postgres psql -U keycloak keycloak < backup.sql
 
 # GCP
-gcloud sql backups restore <BACKUP_ID> --backup-instance=playground-db
+gcloud sql backups restore <BACKUP_ID> --backup-instance=demoapp-db
 ```
 
 ---
@@ -365,8 +364,8 @@ gcloud sql backups restore <BACKUP_ID> --backup-instance=playground-db
 ### Update Images
 
 ```bash
-# Build new images
-./gradlew buildAll
+# Build new Keycloak image
+docker build -t keycloak:1.0.0 Keycloak/
 
 # For GCP, push to registry
 ./scripts/deploy-gcp.sh
@@ -385,10 +384,10 @@ kubectl rollout status deployment keycloak
 ./scripts/cleanup-local.sh
 
 # GCP - Delete cluster
-gcloud container clusters delete playground-cluster --zone us-central1-a
+gcloud container clusters delete demoapp-cluster --zone us-central1-a
 
 # GCP - Delete Cloud SQL
-gcloud sql instances delete playground-db
+gcloud sql instances delete demoapp-db
 ```
 
 ---

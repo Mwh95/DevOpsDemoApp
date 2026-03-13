@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install ingress-nginx controller (containerized) and apply PlaygroundApp Ingress for local K8s.
+# Install ingress-nginx controller (containerized) and apply DemoApp Ingress for local K8s.
 # Run from repository root. Keycloak must already be deployed.
 
 set -e
@@ -23,11 +23,10 @@ kubectl wait --namespace ingress-nginx \
   kubectl get pods -n ingress-nginx
 }
 
-echo "Applying PlaygroundApp Ingress (path /auth -> Keycloak)..."
+echo "Applying DemoApp Ingress (path /auth -> Keycloak)..."
 kubectl apply -f k8s/local/ingress.yaml
 
 echo ""
 echo "Local Ingress is ready."
 echo "Get the NodePort for HTTP: kubectl get svc -n ingress-nginx ingress-nginx-controller"
-echo "Then open: http://localhost:<http-nodeport>/auth"
 echo "On Docker Desktop / Minikube you may be able to use port 80 if the controller got a LoadBalancer."

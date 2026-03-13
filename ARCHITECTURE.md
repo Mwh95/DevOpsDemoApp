@@ -2,15 +2,16 @@
 
 ## Overview
 
-This application is a multi-service platform consisting of three main components:
+This application is a multi-service platform consisting of:
 
-1. **Keycloak** - Authentication and authorization service
-2. **Ingress** - Kubernetes Ingress for routing (ingress-nginx locally, GKE Ingress on GCP)
-3. **Database** - PostgreSQL database for persistent storage
+1. **Keycloak** - Authentication and authorization service (OIDC)
+2. **Map Service (Map Markers)** - Frontend (SPA) and backend (Go REST API) for the map markers app; frontend is embedded in the backend image and served by the same process
+3. **Ingress** - Kubernetes Ingress for routing (ingress-nginx locally, GKE Ingress on GCP)
+4. **Database** - PostgreSQL (MapMarkerDb) for Keycloak and Map Service data
 
 All components are containerized and can be deployed on both local Kubernetes clusters and Google Cloud Platform (GCP).
 
-## Architecture Diagram
+## Target Architecture Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -22,23 +23,24 @@ All components are containerized and can be deployed on both local Kubernetes cl
           ┌──────────────────────────────┐
           │  Ingress (Local: NodePort /   │
           │  GCP: GKE Ingress + LB)      │
-          └──────────────┬───────────────┘
-                         │
-                         │ /auth → keycloak:8080
-                         ▼
-          ┌──────────────────────────────┐
-          │       Keycloak Service        │
-          │         2 Replicas            │
-          │    Port: 8080, 8443           │
-          └──────────────┬───────────────┘
-                         │
-                         │ JDBC
-                         ▼
-          ┌──────────────────────────────┐
-          │    PostgreSQL Database       │
-          │  (Docker Compose / Cloud SQL) │
-          │         Port: 5432           │
-          └──────────────────────────────┘
+          └──────────┬──────────┬─────────┘
+                     │          │
+         /login      │          │  /  and  /api
+         /keycloak/* │          │
+                     ▼          ▼
+    ┌─────────────────┐   ┌─────────────────────────────┐
+    │ Keycloak Service │   │   Map API (Map Markers)     │
+    │  2 Replicas     │   │   Backend (Go) + Frontend   │
+    │  8080, 9000     │   │   (embedded SPA), port 8090 │
+    └────────┬────────┘   └──────────────┬──────────────┘
+             │                           │
+             │ JDBC                      │ JDBC
+             │ keycloak schema           │ mapservice schema
+             ▼                           ▼
+          ┌──────────────────────────────────────────────┐
+          │         PostgreSQL (MapMarkerDb)             │
+          │   (Docker Compose / Cloud SQL), Port: 5432   │
+          └──────────────────────────────────────────────┘
 ```
 
 ## Component Details
@@ -69,9 +71,9 @@ All components are containerized and can be deployed on both local Kubernetes cl
 - **ConfigMap**: Database connection strings, hostname configuration
 - **Secret**: Admin credentials, database passwords
 
-**Health Checks** (with context path `/auth`):
-- Readiness probe: `/auth/health/ready` endpoint
-- Liveness probe: `/auth/health/live` endpoint
+**Health Checks** (context path `/login`; management at `/keycloak`):
+- Readiness probe: `/login/health/ready` (or `/keycloak/health/ready` in local)
+- Liveness probe: `/login/health/live` (or `/keycloak/health/live` in local)
 
 **Resource Allocation** (GCP):
 - Requests: 512Mi memory, 500m CPU
@@ -91,33 +93,57 @@ All components are containerized and can be deployed on both local Kubernetes cl
 - Configured via `k8s/gcp/ingress.yaml` and optionally `scripts/setup-gke-ingress.sh`
 - Console runbook: `docs/gke-ingress-console.md`
 
-**Routing**:
-- Path `/auth` → Keycloak Service (port 8080). Keycloak is configured with `KC_HTTP_RELATIVE_PATH=/auth` so it serves at `/auth` without path rewrite.
+**Routing** (local ingress):
+- `/login` → Keycloak Service (port 8080)
+- `/keycloak/health` → Keycloak (port 9000); `/keycloak/metrics` → Keycloak (port 9000, optional IP allowlist)
+- `/` → Map Frontend (port 80) — serves the Map Markers SPA
+- `/api` → Map API (port 8090) — Map Markers REST API
 
-### 3. Database (PostgreSQL)
+Keycloak is configured with `KC_HTTP_RELATIVE_PATH=/login` (and management at `/keycloak`).
 
-**Purpose**: Persistent data storage for Keycloak
+### 3. Map Service (Map Markers)
+
+**Purpose**: Map Markers application — interactive map with markers; users sign in via Keycloak.
+
+**Components**:
+- **Frontend**: SPA (`MapFrontend/`, image `map-frontend:dev`) served separately at `/`.
+- **Backend**: Go REST API (`MapService/`, image `map-api:dev`) — CRUD for markers, JWT validation via Keycloak JWKS, Liquibase for DB migrations; serves API at `/api`.
+
+**Technology**:
+- Frontend: Vite/React; Docker build: `docker build -t map-frontend:dev MapFrontend/`.
+- Backend: Go; Docker build: `docker build -t map-api:dev MapService/`.
+- Database: PostgreSQL (MapMarkerDb, schema `mapservice`).
+
+**Kubernetes Resources**:
+- Frontend: Deployment (`map-frontend`), Service (port 80).
+- Backend: Deployment (`map-api`), Service (port 8090), ConfigMap (PG_*, KEYCLOAK_ISSUER), Secret (DB credentials).
+- Migrations: standalone `Liquibase` Job that bootstraps users/schemas and applies the `MapService` changelog before the app workloads start.
+
+**Authentication**: API accepts JWTs from Keycloak (realm/client used by the frontend, e.g. client `map-app`). No separate backend client; frontend uses OIDC with Keycloak.
+
+### 4. Database (PostgreSQL)
+
+**Purpose**: Persistent data storage for Keycloak and Map Service
 
 **Technology**: 
-- Base Image: `postgres:15-alpine`
-- Database: PostgreSQL 15
+- Base Image: `postgres:15-alpine` (or 18)
+- Database: **MapMarkerDb** — single database with separate schemas/users for Keycloak and Map Service
 
 **Local Deployment**:
-- Runs as Docker container via docker-compose
+- Runs as Docker container via docker-compose (`Database/docker-compose.yml`)
 - Data persisted in named volume `postgres-data`
 - Exposed on host port 5432
-- Default credentials: `keycloak/keycloak` (⚠️ not for production)
+- Bootstrap user: `postgres`; runtime users: `keycloak` (schema keycloak), `mapservice` (schema mapservice) (⚠️ change for production)
 
 **GCP Deployment**:
 - Google Cloud SQL for PostgreSQL
 - Managed service with automatic backups
-- High availability with failover
 - Accessed via Cloud SQL Proxy or private IP
 
 **Configuration**:
-- Database name: `keycloak`
+- Database name: `MapMarkerDb`
 - Port: 5432
-- Initialization: `config/init.sql`
+- Initialization: `Liquibase/modules/database/bootstrap/changelog.xml` (creates users and schemas)
 
 ## Deployment Environments
 
@@ -133,11 +159,15 @@ All components are containerized and can be deployed on both local Kubernetes cl
 
 **Network Architecture**:
 ```
-localhost:<nodeport> → ingress-nginx → Ingress (path /auth) → keycloak:8080 → postgres:5432
+localhost:<nodeport> → ingress-nginx → Ingress
+                         ├─ /login, /keycloak/* → keycloak:8080/9000 → MapMarkerDb (keycloak schema)
+                         └─ /, /api → map-api:8090 → MapMarkerDb (mapservice schema)
 ```
 
-**Access**:
-- Keycloak: `http://localhost:<nodeport>/auth` (get nodeport: `kubectl get svc -n ingress-nginx ingress-nginx-controller`)
+**Access** (get nodeport: `kubectl get svc -n ingress-nginx ingress-nginx-controller`):
+- Map app (frontend): `http://localhost:<nodeport>/`
+- Map API: `http://localhost:<nodeport>/api`
+- Keycloak login: `http://localhost:<nodeport>/login`
 
 ### GCP Environment
 
@@ -155,8 +185,9 @@ Internet → GCP Load Balancer (from Ingress) → keycloak:8080 → Cloud SQL
 ```
 
 **Access**:
-- External: `http://<INGRESS-ADDRESS>` or `https://your-domain.com`
-- Keycloak: `https://your-domain.com/auth` or `http://<INGRESS-ADDRESS>/auth`
+- Map app: `http://<INGRESS-ADDRESS>/` or `https://your-domain.com/`
+- Map API: `http://<INGRESS-ADDRESS>/api` or `https://your-domain.com/api`
+- Keycloak: `http://<INGRESS-ADDRESS>/login` or `https://your-domain.com/login`
 
 **Required GCP Services**:
 - Google Kubernetes Engine (GKE)
@@ -166,43 +197,55 @@ Internet → GCP Load Balancer (from Ingress) → keycloak:8080 → Cloud SQL
 
 ## Build and Deployment Pipeline
 
-### Gradle Build Structure
+### Build Structure
 
 ```
-PlaygroundApp (root)
-├── settings.gradle         # Multi-project configuration
-├── build.gradle            # Root build configuration
+DemoApp (root)
 ├── k8s/                    # Ingress manifests (shared)
 │   ├── local/              # Local Ingress + controller (script applies controller from URL)
 │   └── gcp/                # GKE Ingress
 ├── Keycloak/
-│   └── build.gradle       # Keycloak-specific tasks
-└── Database/
-    └── build.gradle       # Database-specific tasks
+│   ├── Dockerfile          # Keycloak image
+│   └── k8s/                # Kubernetes manifests (local/, gcp/)
+├── MapService/             # Map Markers backend (Go API)
+│   ├── Dockerfile          # Build from repo root to embed MapFrontend
+│   ├── db/changelog/       # Liquibase migrations
+│   └── k8s/local/          # Deployment, Service, ConfigMap, Secret
+├── MapFrontend/             # Map Markers SPA (embedded into Map API image)
+├── Database/
+│   ├── docker-compose.yml  # Local PostgreSQL (MapMarkerDb)
+│   └── config/             # Init scripts (e.g. init.sql)
+├── scripts/                # Deployment automation
+│   ├── deploy-local.sh     # Build Keycloak + map-api, start DB, deploy K8s and Ingress
+│   ├── deploy-gcp.sh       # Build Keycloak, push to GCR, deploy to GKE
+│   ├── setup-local-ingress.sh
+│   ├── setup-gke-ingress.sh
+│   └── cleanup-local.sh
+└── docs/                   # Runbooks (e.g. GKE Ingress via Console)
 ```
 
-**Available Gradle Tasks**:
-- `buildAll` - Build all Docker images
-- `cleanAll` - Clean all project artifacts
-- `:Keycloak:buildDockerImage` - Build Keycloak image
-- `:Database:startLocalDb` - Start local database
-- `:Database:stopLocalDb` - Stop local database
+**Build and run commands**:
+- **Keycloak image**: `docker build -t keycloak:1.0.0 Keycloak/`
+- **Map API image**: `docker build -t map-api:dev MapService/`
+- **Map Frontend image**: `docker build -t map-frontend:dev MapFrontend/`
+- **Liquibase image**: `docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`
+- **Full local deploy**: `./scripts/deploy-local.sh` (builds Keycloak, map-api, map-frontend, and Liquibase, deploys K8s resources and Ingress)
+- **Full GCP deploy**: `./scripts/deploy-gcp.sh` (requires `GCP_PROJECT_ID` and updated secrets)
 
 ### Deployment Flow
 
 #### Local Deployment
-1. Build Docker images with Gradle
-2. Start PostgreSQL with docker-compose
-3. Deploy Kubernetes manifests from `k8s/local/`
-4. Services accessible via localhost
+1. Build Docker images: Keycloak (`docker build -t keycloak:1.0.0 Keycloak/`), Map API (`docker build -t map-api:dev MapService/`), Map Frontend (`docker build -t map-frontend:dev MapFrontend/`), and Liquibase (`docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`).
+2. Deploy PostgreSQL to the cluster, then run the standalone Liquibase job to bootstrap users/schemas and apply the `MapService` schema changes.
+3. Deploy manifests from `Database/k8s/local/`, `Liquibase/k8s/local/`, `Keycloak/k8s/local/`, `MapService/k8s/local/`, `MapFrontend/k8s/local/`, and `k8s/local/` (via `deploy-local.sh`).
+4. Services accessible via localhost (NodePort from ingress-nginx): Map app at `/`, API at `/api`, Keycloak at `/login`.
 
 #### GCP Deployment
-1. Build Docker images with Gradle
-2. Tag images for Google Container Registry
-3. Push images to GCR
-4. Apply Kubernetes manifests from `k8s/gcp/`
-5. Configure Cloud SQL connection
-6. Services accessible via external IP
+1. Build Keycloak image; optionally build and push Map API image.
+2. Tag and push images to Google Container Registry (GCR).
+3. Apply Kubernetes manifests from `Keycloak/k8s/gcp/`, `MapService/k8s/` (if present), and `k8s/gcp/`.
+4. Configure Cloud SQL connection (MapMarkerDb) and secrets.
+5. Services accessible via external IP (GKE Ingress).
 
 ## Security Considerations
 
@@ -331,9 +374,9 @@ All containers log to stdout/stderr, collected by:
 ### Updating Components
 
 1. **Update base images** in Dockerfiles
-2. **Rebuild images** with Gradle
+2. **Rebuild images** with Docker (`docker build -t keycloak:1.0.0 Keycloak/`, etc.)
 3. **Test in local environment**
-4. **Deploy to GCP** with rolling updates
+4. **Deploy to GCP** with rolling updates (e.g. `./scripts/deploy-gcp.sh` or push then `kubectl rollout restart`)
 5. **Monitor** for issues
 6. **Rollback** if needed
 
@@ -373,4 +416,4 @@ kubectl rollout history deployment keycloak
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/15/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/home/)
 - [GKE Best Practices](https://cloud.google.com/kubernetes-engine/docs/best-practices)
-- [Gradle User Manual](https://docs.gradle.org/current/userguide/userguide.html)
+- [Docker Documentation](https://docs.docker.com/)

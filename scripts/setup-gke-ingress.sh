@@ -1,5 +1,7 @@
 #!/bin/bash
-# Configure GKE Ingress for the PlaygroundApp (Keycloak at /auth).
+# DRAFT
+
+# Configure GKE Ingress for the DemoApp (Keycloak at /auth).
 # Run from repository root. Requires gcloud and kubectl configured for your GKE cluster.
 
 set -e
@@ -30,7 +32,7 @@ kubectl apply -f k8s/gcp/ingress.yaml
 
 echo ""
 echo "GKE Ingress applied. Waiting for external address (this can take a few minutes)..."
-echo "Check status: kubectl get ingress playground-ingress"
+echo "Check status: kubectl get ingress demoapp-ingress"
 echo ""
 echo "Once an ADDRESS is assigned:"
 echo "  - Keycloak: http://<ADDRESS>/auth"

@@ -1,4 +1,6 @@
 #!/bin/bash
+# DRAFT
+
 # Deploy all services to GCP Kubernetes cluster
 
 set -e
@@ -23,7 +25,7 @@ echo "Using GCP Project: $GCP_PROJECT_ID"
 
 # Build and push Docker images
 echo "Building Docker images..."
-./gradlew buildAll
+docker build -t keycloak:1.0.0 Keycloak/
 
 echo "Tagging image for GCR..."
 docker tag keycloak:1.0.0 gcr.io/$GCP_PROJECT_ID/keycloak:1.0.0
@@ -49,4 +51,4 @@ echo ""
 echo "Deployment complete!"
 echo ""
 echo "Check status: kubectl get pods,svc"
-echo "Get Ingress address: kubectl get ingress playground-ingress"
+echo "Get Ingress address: kubectl get ingress demoapp-ingress"

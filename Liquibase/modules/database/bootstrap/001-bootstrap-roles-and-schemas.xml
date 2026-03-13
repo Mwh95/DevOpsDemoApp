@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.20.xsd">
+    <changeSet id="001-bootstrap-roles-and-schemas" author="demoapp" runOnChange="true">
+        <sql splitStatements="false">
+            -- Only use this for local - password have to be changed for real instances.
+            -- Initialize MapMarkerDb: separate users and schemas for Keycloak and MapService
+            -- This script runs as the bootstrap superuser (postgres).
+
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'keycloak') THEN
+                CREATE ROLE keycloak LOGIN PASSWORD 'keycloak';
+              ELSE
+                ALTER ROLE keycloak WITH LOGIN PASSWORD 'keycloak';
+              END IF;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'keycloak') THEN
+                EXECUTE 'CREATE SCHEMA keycloak AUTHORIZATION keycloak';
+              END IF;
+            END
+            $$;
+
+            GRANT USAGE ON SCHEMA keycloak TO keycloak;
+            GRANT CREATE ON SCHEMA keycloak TO keycloak;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA keycloak TO keycloak;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA keycloak TO keycloak;
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA keycloak GRANT ALL ON TABLES TO keycloak;
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA keycloak GRANT ALL ON SEQUENCES TO keycloak;
+
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'mapservice') THEN
+                CREATE ROLE mapservice LOGIN PASSWORD 'mapservice';
+              ELSE
+                ALTER ROLE mapservice WITH LOGIN PASSWORD 'mapservice';
+              END IF;
+            END
+            $$;
+
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'mapservice') THEN
+                EXECUTE 'CREATE SCHEMA mapservice AUTHORIZATION mapservice';
+              END IF;
+            END
+            $$;
+
+            GRANT USAGE ON SCHEMA mapservice TO mapservice;
+            GRANT CREATE ON SCHEMA mapservice TO mapservice;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA mapservice TO mapservice;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA mapservice TO mapservice;
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA mapservice GRANT ALL ON TABLES TO mapservice;
+            ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA mapservice GRANT ALL ON SEQUENCES TO mapservice;
+        </sql>
+    </changeSet>
+</databaseChangeLog>

@@ -1,0 +1,84 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: liquibase
+  labels:
+    app: liquibase
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: liquibase
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+      - name: liquibase
+        image: demoapp-liquibase:dev
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: PG_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: liquibase-config
+              key: PG_HOST
+        - name: PG_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: liquibase-config
+              key: PG_PORT
+        - name: PG_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: liquibase-config
+              key: PG_DATABASE
+        - name: PG_JDBC_PARAMS
+          valueFrom:
+            configMapKeyRef:
+              name: liquibase-config
+              key: PG_JDBC_PARAMS
+        - name: MAPSERVICE_SCHEMA
+          valueFrom:
+            configMapKeyRef:
+              name: liquibase-config
+              key: MAPSERVICE_SCHEMA
+        - name: PG_BOOTSTRAP_USER
+          valueFrom:
+            secretKeyRef:
+              name: liquibase-bootstrap-secret
+              key: username
+        - name: PG_BOOTSTRAP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: liquibase-bootstrap-secret
+              key: password
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+            ephemeral-storage: "256Mi"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+            ephemeral-storage: "512Mi"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: liquibase-config
+data:
+  PG_HOST: "host.minikube.internal"
+  PG_PORT: "5432"
+  PG_DATABASE: "MapMarkerDb"
+  PG_JDBC_PARAMS: ""
+  MAPSERVICE_SCHEMA: "mapservice"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: liquibase-bootstrap-secret
+type: Opaque
+stringData:
+  username: "postgres"
+  password: "postgres"

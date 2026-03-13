@@ -1,0 +1,160 @@
+.app-loading,
+.app-auth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 1rem;
+}
+
+.app-auth button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background: #1a1a2e;
+  color: #eee;
+}
+
+.app-header button {
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  background: #16213e;
+  color: #eee;
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+}
+
+.app-header button:hover {
+  background: #0f3460;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+}
+
+.map-toolbar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.map-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.marker-form-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.marker-form-inner {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  min-width: 320px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.marker-form-inner h3 {
+  margin: 0 0 1rem;
+  font-size: 1.1rem;
+}
+
+.marker-form-inner label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.marker-form-inner input,
+.marker-form-inner textarea {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+.marker-form-inner textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.marker-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.marker-form-actions button {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.marker-form-actions button[type="submit"] {
+  background: #1a1a2e;
+  color: #fff;
+  border: none;
+}
+
+.marker-form-actions button[type="button"] {
+  background: #eee;
+  border: 1px solid #ccc;
+}
+
+.marker-popup .popup-label {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.marker-popup .popup-note {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.marker-popup-actions {
+  margin-top: 8px;
+}
+
+.marker-popup-actions button {
+  margin-right: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}

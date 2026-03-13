@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: map-frontend
+  labels:
+    app: map-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: map-frontend
+  template:
+    metadata:
+      labels:
+        app: map-frontend
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: map-frontend
+        image: map-frontend:dev
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+            ephemeral-storage: "256Mi"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+            ephemeral-storage: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: map-frontend
+  labels:
+    app: map-frontend
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+  selector:
+    app: map-frontend

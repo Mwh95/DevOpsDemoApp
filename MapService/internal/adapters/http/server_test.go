@@ -8,7 +8,7 @@ import (
 )
 
 func TestServer_LivenessEndpointsReturnJSON(t *testing.T) {
-	srv, err := NewServer(nil, nil, "")
+	srv, err := NewServer(nil, nil, "", []string{"http://localhost:5173"})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
 	}
@@ -37,7 +37,7 @@ func TestServer_LivenessEndpointsReturnJSON(t *testing.T) {
 }
 
 func TestServer_ReadinessEndpointsReturnServiceUnavailableWithoutPool(t *testing.T) {
-	srv, err := NewServer(nil, nil, "")
+	srv, err := NewServer(nil, nil, "", []string{"http://localhost:5173"})
 	if err != nil {
 		t.Fatalf("NewServer() error = %v", err)
 	}

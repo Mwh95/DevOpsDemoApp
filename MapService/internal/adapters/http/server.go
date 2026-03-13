@@ -21,10 +21,12 @@ type healthResponse struct {
 	Status string `json:"status"`
 }
 
-// NewServer builds the server with auth, DB, and routes.
-func NewServer(auth *KeycloakJWKSVerifier, pool *pgxpool.Pool, _ string) (*Server, error) {
+// NewServer builds the server with auth, DB, CORS, and routes.
+// allowedOrigins configures which origins are permitted by the CORS middleware.
+func NewServer(auth *KeycloakJWKSVerifier, pool *pgxpool.Pool, _ string, allowedOrigins []string) (*Server, error) {
 	r := chi.NewRouter()
 	r.Use(chimid.RequestID, chimid.RealIP, chimid.Logger, chimid.Recoverer)
+	r.Use(NewCORSMiddleware(allowedOrigins))
 
 	repo := repository.NewPostgresMarkerRepository(pool)
 	uc := usecases.NewMarkerUseCases(repo)

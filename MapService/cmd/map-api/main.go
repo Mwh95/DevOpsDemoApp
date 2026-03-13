@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	httpadapter "github.com/demoapp/map-service/internal/adapters/http"
@@ -12,17 +13,18 @@ import (
 )
 
 const (
-	envDatabaseURL       = "DATABASE_URL"
-	envPGHost            = "PG_HOST"
-	envPGPort            = "PG_PORT"
-	envPGUser            = "PG_USER"
-	envPGPassword        = "PG_PASSWORD"
-	envPGDatabase        = "PG_DATABASE"
-	envDatabaseURLSuffix = "DATABASE_URL_SUFFIX"
-	envKeycloakIssuer    = "KEYCLOAK_ISSUER"
-	envKeycloakJWKSURL   = "KEYCLOAK_JWKS_URL"
-	envStaticDir         = "STATIC_DIR"
-	envPort              = "PORT"
+	envDatabaseURL        = "DATABASE_URL"
+	envPGHost             = "PG_HOST"
+	envPGPort             = "PG_PORT"
+	envPGUser             = "PG_USER"
+	envPGPassword         = "PG_PASSWORD"
+	envPGDatabase         = "PG_DATABASE"
+	envDatabaseURLSuffix  = "DATABASE_URL_SUFFIX"
+	envKeycloakIssuer     = "KEYCLOAK_ISSUER"
+	envKeycloakJWKSURL    = "KEYCLOAK_JWKS_URL"
+	envStaticDir          = "STATIC_DIR"
+	envPort               = "PORT"
+	envCORSAllowedOrigins = "CORS_ALLOWED_ORIGINS"
 
 	defaultPGHost            = "localhost"
 	defaultPGPort            = "5432"
@@ -64,7 +66,8 @@ func main() {
 	}
 
 	staticDir := os.Getenv(envStaticDir)
-	srv, err := httpadapter.NewServer(auth, pool, staticDir)
+	allowedOrigins := parseCORSOrigins(mustGetEnv(envCORSAllowedOrigins))
+	srv, err := httpadapter.NewServer(auth, pool, staticDir, allowedOrigins)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}
@@ -95,4 +98,16 @@ func mustGetEnv(key string) string {
 	}
 	log.Fatalf("missing required env var %s", key)
 	return ""
+}
+
+// parseCORSOrigins splits a comma-separated origin list and trims whitespace.
+func parseCORSOrigins(raw string) []string {
+	parts := strings.Split(raw, ",")
+	origins := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if o := strings.TrimSpace(p); o != "" {
+			origins = append(origins, o)
+		}
+	}
+	return origins
 }

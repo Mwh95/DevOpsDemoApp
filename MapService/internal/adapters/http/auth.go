@@ -26,13 +26,18 @@ type KeycloakJWKSVerifier struct {
 	lastFetch time.Time
 }
 
-// NewKeycloakJWKSVerifier creates a verifier that fetches JWKS from the given issuer (e.g. https://keycloak/login/realms/myrealm).
-// It derives the JWKS URL from issuer by appending /.well-known/openid-configuration and then using jwks_uri.
-func NewKeycloakJWKSVerifier(issuer string, client *http.Client) (*KeycloakJWKSVerifier, error) {
+// NewKeycloakJWKSVerifier creates a verifier that validates tokens against issuer.
+// If jwksURL is empty, it discovers the JWKS endpoint from issuer metadata.
+func NewKeycloakJWKSVerifier(issuer, jwksURL string, client *http.Client) (*KeycloakJWKSVerifier, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	v := &KeycloakJWKSVerifier{issuer: strings.TrimSuffix(issuer, "/"), client: client, keys: make(map[string]*rsa.PublicKey)}
+	v := &KeycloakJWKSVerifier{
+		issuer:  strings.TrimSuffix(issuer, "/"),
+		jwksURL: strings.TrimSuffix(jwksURL, "/"),
+		client:  client,
+		keys:    make(map[string]*rsa.PublicKey),
+	}
 	if err := v.refreshKeys(); err != nil {
 		return nil, err
 	}
@@ -40,23 +45,26 @@ func NewKeycloakJWKSVerifier(issuer string, client *http.Client) (*KeycloakJWKSV
 }
 
 func (v *KeycloakJWKSVerifier) refreshKeys() error {
-	discoveryURL := strings.TrimSuffix(v.issuer, "/") + "/.well-known/openid-configuration"
-	resp, err := v.client.Get(discoveryURL)
-	if err != nil {
-		return fmt.Errorf("fetch oidc config: %w", err)
+	jwksURL := v.jwksURL
+	if jwksURL == "" {
+		discoveryURL := strings.TrimSuffix(v.issuer, "/") + "/.well-known/openid-configuration"
+		resp, err := v.client.Get(discoveryURL)
+		if err != nil {
+			return fmt.Errorf("fetch oidc config: %w", err)
+		}
+		defer resp.Body.Close()
+		var discovery struct {
+			JWKSURI string `json:"jwks_uri"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
+			return fmt.Errorf("decode oidc config: %w", err)
+		}
+		if discovery.JWKSURI == "" {
+			return fmt.Errorf("missing jwks_uri in discovery")
+		}
+		jwksURL = discovery.JWKSURI
 	}
-	defer resp.Body.Close()
-	var discovery struct {
-		JWKSURI string `json:"jwks_uri"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&discovery); err != nil {
-		return fmt.Errorf("decode oidc config: %w", err)
-	}
-	if discovery.JWKSURI == "" {
-		return fmt.Errorf("missing jwks_uri in discovery")
-	}
-	v.jwksURL = discovery.JWKSURI
-	resp2, err := v.client.Get(v.jwksURL)
+	resp2, err := v.client.Get(jwksURL)
 	if err != nil {
 		return fmt.Errorf("fetch jwks: %w", err)
 	}
@@ -76,6 +84,7 @@ func (v *KeycloakJWKSVerifier) refreshKeys() error {
 	}
 	v.keysMu.Lock()
 	defer v.keysMu.Unlock()
+	v.jwksURL = jwksURL
 	v.keys = make(map[string]*rsa.PublicKey)
 	for _, k := range jwks.Keys {
 		if k.Kty != "RSA" || (k.Use != "" && k.Use != "sig") {
@@ -106,15 +115,13 @@ func (v *KeycloakJWKSVerifier) refreshKeys() error {
 // VerifyAndExtract verifies the JWT and returns the subject (user ID). Token should be the raw Bearer token string.
 func (v *KeycloakJWKSVerifier) VerifyAndExtract(ctx context.Context, tokenString string) (subject string, err error) {
 	v.keysMu.RLock()
-	if time.Since(v.lastFetch) > 5*time.Minute {
-		v.keysMu.RUnlock()
-		v.keysMu.Lock()
-		if time.Since(v.lastFetch) > 5*time.Minute {
-			_ = v.refreshKeys()
-		}
-		v.keysMu.Unlock()
-		v.keysMu.RLock()
+	refreshNeeded := time.Since(v.lastFetch) > 5*time.Minute
+	v.keysMu.RUnlock()
+	if refreshNeeded {
+		_ = v.refreshKeys()
 	}
+
+	v.keysMu.RLock()
 	defer v.keysMu.RUnlock()
 
 	tok, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {

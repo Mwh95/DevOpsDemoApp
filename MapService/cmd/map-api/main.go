@@ -20,6 +20,7 @@ const (
 	envPGDatabase        = "PG_DATABASE"
 	envDatabaseURLSuffix = "DATABASE_URL_SUFFIX"
 	envKeycloakIssuer    = "KEYCLOAK_ISSUER"
+	envKeycloakJWKSURL   = "KEYCLOAK_JWKS_URL"
 	envStaticDir         = "STATIC_DIR"
 	envPort              = "PORT"
 
@@ -56,7 +57,8 @@ func main() {
 	}
 
 	issuer := mustGetEnv(envKeycloakIssuer)
-	auth, err := httpadapter.NewKeycloakJWKSVerifier(issuer, &http.Client{Timeout: defaultHTTPClientTimeout})
+	jwksURL := os.Getenv(envKeycloakJWKSURL)
+	auth, err := httpadapter.NewKeycloakJWKSVerifier(issuer, jwksURL, &http.Client{Timeout: defaultHTTPClientTimeout})
 	if err != nil {
 		log.Fatalf("oidc: %v", err)
 	}

@@ -58,6 +58,8 @@ Then use:
 - a `ConfigMap` for non-secret runtime values
 - a `Secret` for database credentials
 
+For local Kubernetes, keep `KEYCLOAK_ISSUER` set to the ingress URL that appears in tokens, and set `KEYCLOAK_JWKS_URL` to the in-cluster Keycloak service URL so the pod can fetch signing keys without calling back to `localhost`.
+
 ## Useful commands
 
 ```bash

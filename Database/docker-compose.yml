@@ -1,30 +1,29 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgres:15-alpine
-    container_name: playground-postgres
+    image: postgres:18.2-trixie
+    container_name: demoapp-postgres
     environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak
+      POSTGRES_DB: MapMarkerDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      # PG 18+ expects a single mount here; data lives in a version subdir (see docker-library/postgres#37)
+      - postgres-data:/var/lib/postgresql
       - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d MapMarkerDb"]
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - playground-network
+      - demoapp-network
 
 volumes:
   postgres-data:
     driver: local
 
 networks:
-  playground-network:
+  demoapp-network:
     driver: bridge

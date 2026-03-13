@@ -35,6 +35,7 @@ Build the standalone frontend container:
 
 ```bash
 docker build -t map-frontend:dev .
+minikube image load map-frontend:dev
 ```
 
 ## Local Kubernetes

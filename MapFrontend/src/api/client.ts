@@ -1,6 +1,7 @@
 import type { Marker, CreateMarkerInput, UpdateMarkerInput } from '../types/marker'
+import { config } from '../config'
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? ''
+const API_BASE = config.VITE_API_BASE
 
 function authHeaders(token: string | undefined): HeadersInit {
   const h: HeadersInit = { 'Content-Type': 'application/json' }

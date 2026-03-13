@@ -19,6 +19,9 @@ spec:
       - name: map-frontend
         image: map-frontend:dev
         imagePullPolicy: IfNotPresent
+        envFrom:
+        - configMapRef:
+            name: map-frontend-config
         ports:
         - name: http
           containerPort: 8080
@@ -49,8 +52,6 @@ kind: ConfigMap
 metadata:
   name: map-frontend-config
 data:
-  # Build-time values: pass as --build-arg when running docker build.
-  # Tracked here as the single source of truth for the local environment.
   VITE_OIDC_AUTHORITY: "http://localhost:50594/login/realms/users"
   VITE_OIDC_CLIENT_ID: "map-app"
   VITE_OIDC_REDIRECT_URI: "http://localhost:50594/"

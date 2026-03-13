@@ -3,22 +3,12 @@ import ReactDOM from 'react-dom/client'
 import { AuthProvider } from 'react-oidc-context'
 import App from './App'
 import './index.css'
-
-const authority =
-  import.meta.env.VITE_OIDC_AUTHORITY ??
-  (typeof window !== 'undefined' ? window.location.origin + '/login/realms/master' : undefined)
-const clientId = import.meta.env.VITE_OIDC_CLIENT_ID ?? 'map-app'
-const redirectUri =
-  import.meta.env.VITE_OIDC_REDIRECT_URI ?? (typeof window !== 'undefined' ? window.location.origin + '/' : '')
-
-if (!authority) {
-  throw new Error('Missing required VITE_OIDC_AUTHORITY configuration')
-}
+import { config } from './config'
 
 const oidcConfig = {
-  authority,
-  client_id: clientId,
-  redirect_uri: redirectUri,
+  authority: config.VITE_OIDC_AUTHORITY,
+  client_id: config.VITE_OIDC_CLIENT_ID,
+  redirect_uri: config.VITE_OIDC_REDIRECT_URI,
   scope: 'openid profile',
 }
 

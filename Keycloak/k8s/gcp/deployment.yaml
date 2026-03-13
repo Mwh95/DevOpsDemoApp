@@ -1,3 +1,4 @@
+# DRAFT
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -58,20 +59,24 @@ spec:
         - name: KC_HOSTNAME_STRICT_HTTPS
           value: "true"
         - name: KC_HTTP_RELATIVE_PATH
-          value: "/auth"
+          value: "/login"
+        - name: KC_HTTP_MANAGEMENT_RELATIVE_PATH
+          value: "/login"
         ports:
         - name: http
           containerPort: 8080
+        - name: management
+          containerPort: 9000
         readinessProbe:
           httpGet:
-            path: /health/ready
-            port: 8080
+            path: /login/health/ready
+            port: management
           initialDelaySeconds: 60
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /auth/health/live
-            port: 8080
+            path: /login/health/live
+            port: management
           initialDelaySeconds: 90
           periodSeconds: 10
         resources:
@@ -96,6 +101,9 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
+  - name: management
+    port: 9000
+    targetPort: 9000
   selector:
     app: keycloak
 ---
@@ -104,7 +112,7 @@ kind: ConfigMap
 metadata:
   name: keycloak-config
 data:
-  db-url: "jdbc:postgresql://CLOUD_SQL_PROXY_HOST:5432/keycloak"
+  db-url: "jdbc:postgresql://CLOUD_SQL_PROXY_HOST:5432/MapMarkerDb?currentSchema=keycloak"
   hostname: "keycloak.example.com"
 ---
 apiVersion: v1

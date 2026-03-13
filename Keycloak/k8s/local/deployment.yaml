@@ -17,39 +17,57 @@ spec:
       automountServiceAccountToken: false
       containers:
       - name: keycloak
-        image: keycloak:1.0.0
+        image: keycloak:dev
         imagePullPolicy: IfNotPresent
-        args: ["start-dev"]
+        args: ["start", "--optimized"]
         env:
-        - name: KEYCLOAK_ADMIN_USERNAME
-          value: "admin"
-        - name: KEYCLOAK_ADMIN_PASSWORD
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          value: "tmpadmin"
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
           value: "admin"
         - name: KC_DB
           value: "postgres"
         - name: KC_DB_URL
-          value: "jdbc:postgresql://postgres:5432/keycloak"
+          value: "jdbc:postgresql://host.minikube.internal:5432/MapMarkerDb?currentSchema=keycloak"
         - name: KC_DB_USERNAME
           value: "keycloak"
         - name: KC_DB_PASSWORD
           value: "keycloak"
-        - name: KC_PROXY
-          value: "edge"
+        - name: KC_HOSTNAME
+          value: "http://localhost:50594/login"
+        - name: KC_HOSTNAME_ADMIN
+          value: "http://127.0.0.1:50594/login"
         - name: KC_HOSTNAME_STRICT
+          value: "true"
+        - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
           value: "false"
+        - name: KC_HTTP_ENABLED
+          value: "true"
+        - name: KC_LOG
+          value: "console,file"
+        - name: KC_LOG_CONSOLE_LEVEL
+          value: "error"
+        - name: KC_LOG_FILE
+          value: "/opt/keycloak/log/server.log"
+        - name: KC_LOG_ASYNC
+          value: "true"
+        - name: KC_CACHE
+          value: "ispn"
         ports:
         - name: http
           containerPort: 8080
+        - name: management
+          containerPort: 9000
         readinessProbe:
           httpGet:
-            path: /health/ready
-            port: 8080
+            path: /keycloak/health/ready
+            port: management
           initialDelaySeconds: 60
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /health/live
-            port: 8080
+            path: /keycloak/health/live
+            port: management
           initialDelaySeconds: 90
           periodSeconds: 10
         resources:
@@ -74,5 +92,8 @@ spec:
   - name: http
     port: 8080
     targetPort: 8080
+  - name: management
+    port: 9000
+    targetPort: 9000
   selector:
     app: keycloak

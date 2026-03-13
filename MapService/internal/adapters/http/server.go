@@ -1,0 +1,63 @@
+package http
+
+import (
+	"net/http"
+	"os"
+
+	"github.com/demoapp/map-service/internal/adapters/repository"
+	"github.com/demoapp/map-service/internal/usecases"
+	"github.com/go-chi/chi/v5"
+	chimid "github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Server configures and runs the map API HTTP server.
+type Server struct {
+	Router *chi.Mux
+}
+
+// NewServer builds the server with auth, DB, and routes.
+func NewServer(auth *KeycloakJWKSVerifier, pool *pgxpool.Pool, _ string) (*Server, error) {
+	r := chi.NewRouter()
+	r.Use(chimid.RequestID, chimid.RealIP, chimid.Logger, chimid.Recoverer)
+
+	repo := repository.NewPostgresMarkerRepository(pool)
+	uc := usecases.NewMarkerUseCases(repo)
+	handler := NewMarkerHandler(uc)
+
+	r.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		if err := pool.Ping(r.Context()); err != nil {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Route("/api", func(r chi.Router) {
+		r.Use(auth.RequireAuth)
+		r.Get("/markers", handler.List)
+		r.Post("/markers", handler.Create)
+		r.Get("/markers/{id}", handler.Get)
+		r.Put("/markers/{id}", handler.Update)
+		r.Delete("/markers/{id}", handler.Delete)
+	})
+
+	return &Server{Router: r}, nil
+}
+
+// Run starts the HTTP server on the given addr. If addr is empty, uses PORT env or ":8090".
+func (s *Server) Run(addr string) error {
+	if addr == "" {
+		addr = os.Getenv("PORT")
+		if addr == "" {
+			addr = ":8090"
+		}
+		if addr[0] != ':' && addr[0] != '0' {
+			addr = ":" + addr
+		}
+	}
+	return http.ListenAndServe(addr, s.Router)
+}

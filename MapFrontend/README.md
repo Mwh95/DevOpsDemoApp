@@ -34,7 +34,7 @@ Output is written to `dist/`.
 Build the standalone frontend container:
 
 ```bash
-docker build -t map-frontend:dev MapFrontend/
+docker build -t map-frontend:dev .
 ```
 
 ## Local Kubernetes
@@ -42,7 +42,8 @@ docker build -t map-frontend:dev MapFrontend/
 Apply the local frontend Deployment and Service:
 
 ```bash
-kubectl apply -f MapFrontend/k8s/local/deployment.yaml
+kubectl apply -f ./k8s/local/deployment.yaml
+kubectl rollout status deployment/map-frontend
 ```
 
 ## Tests

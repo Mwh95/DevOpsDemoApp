@@ -1,5 +1,10 @@
 # npm
 /node_modules
-
+/.vite
+/dist
+*.tsbuildinfo
 # vitest report
 /coverage
+
+# local env file
+.env.local

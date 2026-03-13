@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 
@@ -16,6 +17,10 @@ type Server struct {
 	Router *chi.Mux
 }
 
+type healthResponse struct {
+	Status string `json:"status"`
+}
+
 // NewServer builds the server with auth, DB, and routes.
 func NewServer(auth *KeycloakJWKSVerifier, pool *pgxpool.Pool, _ string) (*Server, error) {
 	r := chi.NewRouter()
@@ -25,15 +30,11 @@ func NewServer(auth *KeycloakJWKSVerifier, pool *pgxpool.Pool, _ string) (*Serve
 	uc := usecases.NewMarkerUseCases(repo)
 	handler := NewMarkerHandler(uc)
 
-	r.Get("/health/ready", func(w http.ResponseWriter, r *http.Request) {
-		if err := pool.Ping(r.Context()); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
+	r.Get("/public/health/ready", func(w http.ResponseWriter, r *http.Request) {
+		writeReadinessJSON(w, r, pool)
 	})
-	r.Get("/health/live", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+	r.Get("/public/health/live", func(w http.ResponseWriter, r *http.Request) {
+		writeHealthJSON(w)
 	})
 
 	r.Route("/api", func(r chi.Router) {
@@ -60,4 +61,21 @@ func (s *Server) Run(addr string) error {
 		}
 	}
 	return http.ListenAndServe(addr, s.Router)
+}
+
+func writeHealthJSON(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
+}
+
+func writeReadinessJSON(w http.ResponseWriter, r *http.Request, pool *pgxpool.Pool) {
+	w.Header().Set("Content-Type", "application/json")
+	if pool == nil || pool.Ping(r.Context()) != nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(healthResponse{Status: "DOWN"})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(healthResponse{Status: "UP"})
 }

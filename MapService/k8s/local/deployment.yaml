@@ -64,13 +64,13 @@ spec:
           containerPort: 8090
         readinessProbe:
           httpGet:
-            path: /health/ready
+            path: /public/health/ready
             port: 8090
           initialDelaySeconds: 5
           periodSeconds: 10
         livenessProbe:
           httpGet:
-            path: /health/live
+            path: /public/health/live
             port: 8090
           initialDelaySeconds: 10
           periodSeconds: 10

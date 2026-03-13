@@ -16,6 +16,13 @@ spec:
             name: map-api
             port:
               number: 8090
+      - path: /public
+        pathType: Prefix
+        backend:
+          service:
+            name: map-api
+            port:
+              number: 8090
       - path: /keycloak/health
         pathType: Prefix
         backend:

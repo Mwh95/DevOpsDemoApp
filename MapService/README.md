@@ -1,6 +1,16 @@
 # Map API (Go)
 
 REST API for the Map Markers app.
+## TLDR
+```bash
+docker build -t map-api:dev .
+minikube image load map-api:dev
+kubectl apply -f ./k8s/local/deployment.yaml
+kubectl rollout status deployment/map-api
+# some times you need to restart if the previous deployment was not successful
+# kubectl rollout restart deployment/map-api
+
+```
 
 ## Build the container image
 
@@ -47,7 +57,8 @@ kubectl port-forward svc/map-api 8090:8090
 Then use:
 
 - `http://localhost:8090/api`
-- `http://localhost:8090/health/ready`
+- `http://localhost:8090/public/health/ready`
+- `http://localhost:8090/public/health/live`
 
 ## Local manifest contents
 

@@ -1,22 +1,54 @@
+# DRAFT
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: playground-ingress
+  name: demoapp-ingress
   labels:
-    app: playground
+    app: demoapp
   annotations:
     # Optional: use a reserved static IP (uncomment and set after creating the address)
-    # kubernetes.io/ingress.global-static-ip-name: "playground-ingress-ip"
+    # kubernetes.io/ingress.global-static-ip-name: "demoapp-ingress-ip"
     # Optional: use a managed certificate for HTTPS (uncomment and create ManagedCertificate first)
-    # networking.gke.io/managed-certificates: "playground-tls"
+    # networking.gke.io/managed-certificates: "demoapp-tls"
 spec:
   rules:
   - http:
       paths:
-      - path: /auth
+      - path: /login/health
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              number: 9000
+      - path: /login
         pathType: Prefix
         backend:
           service:
             name: keycloak
             port:
               number: 8080
+---
+# Metrics path in a separate Ingress so IP allowlisting can apply only to /login/metrics.
+# For NGINX Ingress on GKE: use the annotation below (replace CIDR with your IP range).
+# For native GKE Ingress (GCE): this annotation is ignored; use a Cloud Armor security policy
+# attached to the backend to restrict by IP.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demoapp-ingress-metrics
+  labels:
+    app: demoapp
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: "10.0.0.0/8,192.168.0.0/16,127.0.0.0/16"  # e.g. "1.2.3.0/24"
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /login/metrics
+        pathType: Prefix
+        backend:
+          service:
+            name: keycloak
+            port:
+              number: 9000

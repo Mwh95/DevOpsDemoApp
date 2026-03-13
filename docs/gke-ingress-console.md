@@ -1,6 +1,8 @@
+# DRAFT
+
 # Configure GKE Ingress via Google Cloud Console
 
-This runbook describes how to create and configure the PlaygroundApp Ingress using the Google Cloud Console (UI).
+This runbook describes how to create and configure the DemoApp Ingress using the Google Cloud Console (UI).
 
 ## Prerequisites
 
@@ -26,13 +28,13 @@ This runbook describes how to create and configure the PlaygroundApp Ingress usi
    ```bash
    kubectl apply -f k8s/gcp/ingress.yaml
    ```
-3. Check the Ingress: `kubectl get ingress playground-ingress`.
+3. Check the Ingress: `kubectl get ingress demoapp-ingress`.
 
 ## Optional: Reserve a static IP
 
 1. **VPC network > IP addresses**.
 2. **Reserve external static address**.
-3. Name (e.g. `playground-ingress-ip`), type **Global** (for HTTP(S) load balancing).
+3. Name (e.g. `demoapp-ingress-ip`), type **Global** (for HTTP(S) load balancing).
 4. Add the annotation to the Ingress as in Option 1.
 
 ## Optional: HTTPS with Managed Certificate

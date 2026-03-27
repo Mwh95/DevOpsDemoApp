@@ -216,7 +216,7 @@ DemoApp (root)
 │   ├── docker-compose.yml  # Local PostgreSQL (MapMarkerDb)
 │   └── config/             # Init scripts (e.g. init.sql)
 ├── scripts/                # Deployment automation
-│   ├── deploy-local.sh     # Build Keycloak + map-api, start DB, deploy K8s and Ingress
+│   ├── deploy-local.sh     # Deploy local images to K8s; add --build to rebuild first
 │   ├── deploy-gcp.sh       # Build Keycloak, push to GCR, deploy to GKE
 │   ├── setup-local-ingress.sh
 │   ├── setup-gke-ingress.sh
@@ -229,16 +229,16 @@ DemoApp (root)
 - **Map API image**: `docker build -t map-api:dev MapService/`
 - **Map Frontend image**: `docker build -t map-frontend:dev MapFrontend/`
 - **Liquibase image**: `docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`
-- **Full local deploy**: `./scripts/deploy-local.sh` (builds Keycloak, map-api, map-frontend, and Liquibase, deploys K8s resources and Ingress)
+- **Full local deploy**: `./scripts/deploy-local.sh` (deploys existing local images with Helm) or `./scripts/deploy-local.sh --build` (rebuilds Keycloak, map-api, map-frontend, and Liquibase first)
 - **Full GCP deploy**: `./scripts/deploy-gcp.sh` (requires `GCP_PROJECT_ID` and updated secrets)
 
 ### Deployment Flow
 
 #### Local Deployment
-1. Build Docker images: Keycloak (`docker build -t keycloak:1.0.0 Keycloak/`), Map API (`docker build -t map-api:dev MapService/`), Map Frontend (`docker build -t map-frontend:dev MapFrontend/`), and Liquibase (`docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`).
-2. Deploy PostgreSQL to the cluster, then run the standalone Liquibase job to bootstrap users/schemas and apply the `MapService` schema changes.
-3. Deploy manifests from `Database/k8s/local/`, `Liquibase/k8s/local/`, `Keycloak/k8s/local/`, `MapService/k8s/local/`, `MapFrontend/k8s/local/`, and `k8s/local/` (via `deploy-local.sh`).
-4. Services accessible via localhost (NodePort from ingress-nginx): Map app at `/`, API at `/api`, Keycloak at `/login`.
+1. Optionally rebuild Docker images with `./scripts/deploy-local.sh --build`; otherwise `./scripts/deploy-local.sh` reuses existing local images.
+2. Load the local images into Minikube when needed, install `ingress-nginx` with Helm, and run the DemoApp Helm chart.
+3. Run the standalone Liquibase job to bootstrap users/schemas and apply the `MapService` schema changes before the rest of the application rolls out.
+4. Services are accessible after port-forwarding ingress-nginx on `50594`: Map app at `/`, API at `/api`, Keycloak at `/login`.
 
 #### GCP Deployment
 1. Build Keycloak image; optionally build and push Map API image.

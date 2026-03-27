@@ -63,8 +63,11 @@ cd ..
 ### Step 4: Deploy to Kubernetes
 
 ```bash
-# Deploy all services
+# Deploy all services with existing local images
 ./scripts/deploy-local.sh
+
+# Rebuild images, then deploy
+./scripts/deploy-local.sh --build
 
 # Wait for pods to be ready (may take 1-2 minutes)
 kubectl get pods -w

@@ -136,11 +136,11 @@ See [Database/README.md](Database/README.md) for details.
 - Default admin: `tmpadmin/admin` (local)
 - Database: PostgreSQL
 - Ports: 8080 (HTTP), 8443 (HTTPS)
-- Health checks (with context path `/auth`): `/auth/health/ready`, `/auth/health/live`
+- Health checks (with context path `/login`): `/login/health/ready`, `/login/health/live`
 
 ### Ingress
-- Local: ingress-nginx controller; path `/auth` → Keycloak (NodePort).
-- GCP: GKE Ingress; path `/auth` → Keycloak. See `docs/gke-ingress-console.md` for Console setup.
+- Local: ingress-nginx controller; path `/login` → Keycloak (NodePort).
+- GCP: GKE Ingress; path `/login` → Keycloak. See `docs/gke-ingress-console.md` for Console setup.
 
 ### Database
 - Engine: PostgreSQL 18.2

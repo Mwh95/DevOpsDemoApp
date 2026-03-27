@@ -1,0 +1,131 @@
+rolloutToken: ""
+
+mapApi:
+  replicaCount: 1
+  image:
+    repository: map-api
+    tag: dev
+    pullPolicy: IfNotPresent
+  port: 8090
+  database:
+    host: host.minikube.internal
+    port: 5432
+    name: MapMarkerDb
+    username: mapservice
+    password: mapservice
+    urlSuffix: "?sslmode=disable&search_path=mapservice"
+  keycloak:
+    issuer: http://localhost:50594/login/realms/users
+    jwksUrl: http://keycloak:8080/login/realms/users/protocol/openid-connect/certs
+    waitForReady:
+      enabled: true
+      url: http://keycloak:9000/keycloak/health/ready
+      checkIntervalSeconds: 2
+      image:
+        repository: busybox
+        tag: "1.36.1"
+        pullPolicy: IfNotPresent
+  corsAllowedOrigins: http://localhost:5173,http://localhost:50594
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+      ephemeral-storage: 1Gi
+    limits:
+      memory: 256Mi
+      cpu: 500m
+      ephemeral-storage: 2Gi
+
+mapFrontend:
+  replicaCount: 1
+  image:
+    repository: map-frontend
+    tag: dev
+    pullPolicy: IfNotPresent
+  containerPort: 8080
+  servicePort: 80
+  oidc:
+    authority: http://localhost:50594/login/realms/users
+    clientId: map-app
+    redirectUri: http://localhost:50594/
+  resources:
+    requests:
+      memory: 32Mi
+      cpu: 25m
+      ephemeral-storage: 256Mi
+    limits:
+      memory: 128Mi
+      cpu: 250m
+      ephemeral-storage: 512Mi
+
+keycloak:
+  replicaCount: 2
+  image:
+    repository: keycloak
+    tag: dev
+    pullPolicy: IfNotPresent
+  args:
+    - start
+    - --optimized
+  admin:
+    username: tmpadmin
+    password: admin
+  database:
+    host: host.minikube.internal
+    port: 5432
+    name: MapMarkerDb
+    username: keycloak
+    password: keycloak
+    currentSchema: keycloak
+  hostname: http://localhost:50594/login
+  hostnameAdmin: http://127.0.0.1:50594/login
+  hostnameStrict: "true"
+  hostnameBackchannelDynamic: "false"
+  httpEnabled: "true"
+  log:
+    output: console,file
+    consoleLevel: error
+    file: /opt/keycloak/log/server.log
+    async: "true"
+  cache: ispn
+  ports:
+    http: 8080
+    management: 9000
+  resources:
+    requests:
+      memory: 512Mi
+      cpu: 500m
+      ephemeral-storage: 1Gi
+    limits:
+      memory: 1Gi
+      cpu: 1000m
+      ephemeral-storage: 2Gi
+
+liquibase:
+  image:
+    repository: demoapp-liquibase
+    tag: dev
+    pullPolicy: IfNotPresent
+  database:
+    host: host.minikube.internal
+    port: 5432
+    name: MapMarkerDb
+    jdbcParams: ""
+    mapserviceSchema: mapservice
+  bootstrap:
+    username: postgres
+    password: postgres
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+      ephemeral-storage: 256Mi
+    limits:
+      memory: 512Mi
+      cpu: 500m
+      ephemeral-storage: 512Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  metricsWhitelistSourceRange: 10.0.0.0/8,192.168.0.0/16,127.0.0.0/16

@@ -1,15 +1,13 @@
 #!/bin/bash
-# Cleanup local deployment
+# Cleanup local Helm releases.
 
-set -e
+set -euo pipefail
 
 echo "Removing Kubernetes resources..."
-kubectl delete -f k8s/local/ingress.yaml --ignore-not-found=true
-kubectl delete -f MapFrontend/k8s/local/ --ignore-not-found=true
-kubectl delete -f MapService/k8s/local/ --ignore-not-found=true
-kubectl delete -f Liquibase/k8s/local/ --ignore-not-found=true
-kubectl delete -f Keycloak/k8s/local/ --ignore-not-found=true
-kubectl delete -f Database/k8s/local/ --ignore-not-found=true
-kubectl delete namespace ingress-nginx --ignore-not-found=true --timeout=60s 2>/dev/null || true
+helm uninstall demoapp --ignore-not-found=true || true
+helm uninstall ingress-nginx -n ingress-nginx --ignore-not-found=true || true
+
+# non critical error, namespace may already be gone
+kubectl delete namespace ingress-nginx --ignore-not-found=true --timeout=10s 2>/dev/null || true
 
 echo "Cleanup complete!"

@@ -1,26 +1,31 @@
 #!/bin/bash
-# Deploy all services to local Kubernetes cluster
+# Build local images and deploy the DemoApp stack with Helm.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 CURRENT_CONTEXT="$(kubectl config current-context 2>/dev/null || true)"
+CHART_PATH="$REPO_ROOT/deploy/helm/demoapp"
+ROLL_OUT_TOKEN="$(date +%s)"
+
+require_command() {
+  local command_name="$1"
+
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    echo "Required command not found: $command_name"
+    exit 1
+  fi
+}
 
 load_local_image() {
   local image="$1"
 
   case "$CURRENT_CONTEXT" in
-    kind-*)
-      kind load docker-image "$image"
-      ;;
     minikube)
       minikube image load "$image"
-      ;;
-    docker-desktop|rancher-desktop|orbstack)
-      echo "Using local Docker image directly in context: $CURRENT_CONTEXT"
       ;;
     *)
       echo "Current context '$CURRENT_CONTEXT' may require manual image loading for $image."
@@ -28,17 +33,29 @@ load_local_image() {
   esac
 }
 
-echo "Building Docker images..."
-docker build -t keycloak:dev Keycloak/
+require_command docker
+require_command kubectl
+require_command helm
+
+echo "Building Keycloak images..."
+cd Keycloak/
+docker build -t keycloak:dev .
+cd ..
 
 echo "Building Map API image..."
-docker build -t map-api:dev MapService/
+cd MapService
+docker build -t map-api:dev .
+cd ..
 
 echo "Building Map Frontend image..."
-docker build -t map-frontend:dev MapFrontend/
+cd MapFrontend
+docker build -t map-frontend:dev .
+cd ..
 
 echo "Building Liquibase image..."
-docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .
+cd Liquibase
+docker build -t demoapp-liquibase:dev .
+cd ..
 
 echo "Loading local images into the Kubernetes cluster when needed..."
 load_local_image keycloak:dev
@@ -46,21 +63,15 @@ load_local_image map-api:dev
 load_local_image map-frontend:dev
 load_local_image demoapp-liquibase:dev
 
-echo "Deploying to Kubernetes..."
-kubectl apply -f Database/k8s/local/
-kubectl rollout status deployment/postgres --timeout=180s
-kubectl delete -f Liquibase/k8s/local/ --ignore-not-found=true
-kubectl apply -f Liquibase/k8s/local/
-kubectl wait --for=condition=complete job/liquibase --timeout=180s
-kubectl apply -f Keycloak/k8s/local/
-kubectl apply -f MapService/k8s/local/
-kubectl apply -f MapFrontend/k8s/local/
-kubectl rollout status deployment/keycloak --timeout=180s
-kubectl rollout status deployment/map-api --timeout=180s
-kubectl rollout status deployment/map-frontend --timeout=180s
-
-echo "Setting up Ingress (controller + routing)..."
+echo "Installing ingress-nginx with Helm..."
 ./scripts/setup-local-ingress.sh
+
+echo "Deploying DemoApp with Helm..."
+helm upgrade --install demoapp "$CHART_PATH" \
+  --set-string rolloutToken="$ROLL_OUT_TOKEN" \
+  --wait \
+  --wait-for-jobs \
+  --timeout 5m
 
 echo ""
 echo "Deployment complete!"

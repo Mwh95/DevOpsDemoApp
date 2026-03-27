@@ -40,6 +40,7 @@ DemoApp/
 - Docker and Docker Compose
 - Kubernetes (Docker Desktop, Minikube, or Kind)
 - kubectl
+- Helm
 
 ## Quick Start
 
@@ -52,6 +53,8 @@ DemoApp/
 ```bash
 ./scripts/deploy-local.sh
 ```
+
+This script now builds the local images, installs `ingress-nginx` with Helm, and runs `helm upgrade --install` for the DemoApp chart at `deploy/helm/demoapp`.
 
 3. Run port-forwarding to ingress on port `50594` in a separate shell:
 ```shell
@@ -120,8 +123,8 @@ See [Database/README.md](Database/README.md) for details.
 ### Local Environment
 - PostgreSQL runs via Docker Compose (`Database/docker-compose.yml`); not deployed to Kubernetes.
 - Keycloak runs in Kubernetes and connects to the local PostgreSQL (host from cluster).
-- Ingress (ingress-nginx) is installed by `scripts/setup-local-ingress.sh` and routes `/auth` to Keycloak.
-- Access: http://localhost:\<nodeport\>/auth (nodeport from `kubectl get svc -n ingress-nginx ingress-nginx-controller`).
+- Ingress is installed with Helm by `scripts/setup-local-ingress.sh`, while the app routes are managed by the DemoApp Helm chart.
+- Access after port-forwarding: `http://localhost:50594/` and `http://localhost:50594/login`.
 
 ### DRAFT: GCP Environment
 - PostgreSQL on Cloud SQL (recommended)
@@ -151,7 +154,7 @@ See [Database/README.md](Database/README.md) for details.
 ## Customization
 
 ### Adding Routes
-Edit `k8s/local/ingress.yaml` or `k8s/gcp/ingress.yaml` to add path rules and backend services, then re-apply.
+Edit `deploy/helm/demoapp/templates/ingress.yaml` for local routing or `k8s/gcp/ingress.yaml` for GCP, then redeploy.
 
 ### Keycloak Configuration
 Add realm export files to `Keycloak/` and update Dockerfile:
@@ -189,6 +192,7 @@ kubectl port-forward svc/keycloak 8080:8080
 - Build Map Frontend: `docker build -t map-frontend:dev MapFrontend/`
 - Build Liquibase: `docker build -f Liquibase/Dockerfile -t demoapp-liquibase:dev .`
 - Deploy locally: `./scripts/deploy-local.sh`; cleanup: `./scripts/cleanup-local.sh`
+- Helm chart: `deploy/helm/demoapp`
 
 For more commands and troubleshooting, see [QUICKSTART.md](QUICKSTART.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 

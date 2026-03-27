@@ -1,0 +1,71 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demoapp-ingress
+  labels:
+    app: demoapp
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: map-api
+                port:
+                  number: {{ .Values.mapApi.port }}
+          - path: /public
+            pathType: Prefix
+            backend:
+              service:
+                name: map-api
+                port:
+                  number: {{ .Values.mapApi.port }}
+          - path: /keycloak/health
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: {{ .Values.keycloak.ports.management }}
+          - path: /login
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: {{ .Values.keycloak.ports.http }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: map-frontend
+                port:
+                  number: {{ .Values.mapFrontend.servicePort }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demoapp-ingress-metrics
+  labels:
+    app: demoapp
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ .Values.ingress.metricsWhitelistSourceRange | quote }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /keycloak/metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: {{ .Values.keycloak.ports.management }}
+{{- end }}

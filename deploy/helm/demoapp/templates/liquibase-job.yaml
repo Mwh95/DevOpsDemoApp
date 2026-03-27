@@ -1,0 +1,99 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: liquibase
+  labels:
+    app: liquibase
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 1
+  template:
+    metadata:
+      labels:
+        app: liquibase
+        {{- include "demoapp.commonLabels" . | nindent 8 }}
+      annotations:
+        demoapp/rollout-token: {{ .Values.rolloutToken | quote }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      containers:
+        - name: liquibase
+          image: "{{ .Values.liquibase.image.repository }}:{{ .Values.liquibase.image.tag }}"
+          imagePullPolicy: {{ .Values.liquibase.image.pullPolicy }}
+          env:
+            - name: PG_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: liquibase-config
+                  key: PG_HOST
+            - name: PG_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: liquibase-config
+                  key: PG_PORT
+            - name: PG_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: liquibase-config
+                  key: PG_DATABASE
+            - name: PG_JDBC_PARAMS
+              valueFrom:
+                configMapKeyRef:
+                  name: liquibase-config
+                  key: PG_JDBC_PARAMS
+            - name: MAPSERVICE_SCHEMA
+              valueFrom:
+                configMapKeyRef:
+                  name: liquibase-config
+                  key: MAPSERVICE_SCHEMA
+            - name: PG_BOOTSTRAP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: liquibase-bootstrap-secret
+                  key: username
+            - name: PG_BOOTSTRAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: liquibase-bootstrap-secret
+                  key: password
+          resources:
+            {{- toYaml .Values.liquibase.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: liquibase-config
+  labels:
+    app: liquibase
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-2"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  PG_HOST: {{ .Values.liquibase.database.host | quote }}
+  PG_PORT: {{ .Values.liquibase.database.port | quote }}
+  PG_DATABASE: {{ .Values.liquibase.database.name | quote }}
+  PG_JDBC_PARAMS: {{ .Values.liquibase.database.jdbcParams | quote }}
+  MAPSERVICE_SCHEMA: {{ .Values.liquibase.database.mapserviceSchema | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: liquibase-bootstrap-secret
+  labels:
+    app: liquibase
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+type: Opaque
+stringData:
+  username: {{ .Values.liquibase.bootstrap.username | quote }}
+  password: {{ .Values.liquibase.bootstrap.password | quote }}

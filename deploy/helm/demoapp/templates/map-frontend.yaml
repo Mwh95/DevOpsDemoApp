@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: map-frontend
+  labels:
+    app: map-frontend
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mapFrontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: map-frontend
+  template:
+    metadata:
+      labels:
+        app: map-frontend
+        {{- include "demoapp.commonLabels" . | nindent 8 }}
+      annotations:
+        demoapp/rollout-token: {{ .Values.rolloutToken | quote }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: map-frontend
+          image: "{{ .Values.mapFrontend.image.repository }}:{{ .Values.mapFrontend.image.tag }}"
+          imagePullPolicy: {{ .Values.mapFrontend.image.pullPolicy }}
+          envFrom:
+            - configMapRef:
+                name: map-frontend-config
+          ports:
+            - name: http
+              containerPort: {{ .Values.mapFrontend.containerPort }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.mapFrontend.containerPort }}
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.mapFrontend.containerPort }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.mapFrontend.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map-frontend-config
+  labels:
+    app: map-frontend
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+data:
+  VITE_OIDC_AUTHORITY: {{ .Values.mapFrontend.oidc.authority | quote }}
+  VITE_OIDC_CLIENT_ID: {{ .Values.mapFrontend.oidc.clientId | quote }}
+  VITE_OIDC_REDIRECT_URI: {{ .Values.mapFrontend.oidc.redirectUri | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: map-frontend
+  labels:
+    app: map-frontend
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.mapFrontend.servicePort }}
+      targetPort: {{ .Values.mapFrontend.containerPort }}
+  selector:
+    app: map-frontend

@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.keycloak.replicaCount }}
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        {{- include "demoapp.commonLabels" . | nindent 8 }}
+      annotations:
+        demoapp/rollout-token: {{ .Values.rolloutToken | quote }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.keycloak.args | nindent 12 }}
+          env:
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              value: {{ .Values.keycloak.admin.username | quote }}
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              value: {{ .Values.keycloak.admin.password | quote }}
+            - name: KC_DB
+              value: "postgres"
+            - name: KC_DB_URL
+              value: {{ printf "jdbc:postgresql://%s:%v/%s?currentSchema=%s" .Values.keycloak.database.host .Values.keycloak.database.port .Values.keycloak.database.name .Values.keycloak.database.currentSchema | quote }}
+            - name: KC_DB_USERNAME
+              value: {{ .Values.keycloak.database.username | quote }}
+            - name: KC_DB_PASSWORD
+              value: {{ .Values.keycloak.database.password | quote }}
+            - name: KC_HOSTNAME
+              value: {{ .Values.keycloak.hostname | quote }}
+            - name: KC_HOSTNAME_ADMIN
+              value: {{ .Values.keycloak.hostnameAdmin | quote }}
+            - name: KC_HOSTNAME_STRICT
+              value: {{ .Values.keycloak.hostnameStrict | quote }}
+            - name: KC_HOSTNAME_BACKCHANNEL_DYNAMIC
+              value: {{ .Values.keycloak.hostnameBackchannelDynamic | quote }}
+            - name: KC_HTTP_ENABLED
+              value: {{ .Values.keycloak.httpEnabled | quote }}
+            - name: KC_LOG
+              value: {{ .Values.keycloak.log.output | quote }}
+            - name: KC_LOG_CONSOLE_LEVEL
+              value: {{ .Values.keycloak.log.consoleLevel | quote }}
+            - name: KC_LOG_FILE
+              value: {{ .Values.keycloak.log.file | quote }}
+            - name: KC_LOG_ASYNC
+              value: {{ .Values.keycloak.log.async | quote }}
+            - name: KC_CACHE
+              value: {{ .Values.keycloak.cache | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.keycloak.ports.http }}
+            - name: management
+              containerPort: {{ .Values.keycloak.ports.management }}
+          readinessProbe:
+            httpGet:
+              path: /keycloak/health/ready
+              port: management
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /keycloak/health/live
+              port: management
+            initialDelaySeconds: 90
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.keycloak.ports.http }}
+      targetPort: {{ .Values.keycloak.ports.http }}
+    - name: management
+      port: {{ .Values.keycloak.ports.management }}
+      targetPort: {{ .Values.keycloak.ports.management }}
+  selector:
+    app: keycloak

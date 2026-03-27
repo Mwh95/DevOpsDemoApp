@@ -1,0 +1,144 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: map-api
+  labels:
+    app: map-api
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mapApi.replicaCount }}
+  selector:
+    matchLabels:
+      app: map-api
+  template:
+    metadata:
+      labels:
+        app: map-api
+        {{- include "demoapp.commonLabels" . | nindent 8 }}
+      annotations:
+        demoapp/rollout-token: {{ .Values.rolloutToken | quote }}
+    spec:
+      automountServiceAccountToken: false
+      initContainers:
+        {{- if .Values.mapApi.keycloak.waitForReady.enabled }}
+        - name: wait-for-keycloak
+          image: "{{ .Values.mapApi.keycloak.waitForReady.image.repository }}:{{ .Values.mapApi.keycloak.waitForReady.image.tag }}"
+          imagePullPolicy: {{ .Values.mapApi.keycloak.waitForReady.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              until wget -q --spider "{{ .Values.mapApi.keycloak.waitForReady.url }}"; do
+                echo "Waiting for Keycloak readiness endpoint..."
+                sleep {{ .Values.mapApi.keycloak.waitForReady.checkIntervalSeconds }}
+              done
+        {{- end }}
+      containers:
+        - name: map-api
+          image: "{{ .Values.mapApi.image.repository }}:{{ .Values.mapApi.image.tag }}"
+          imagePullPolicy: {{ .Values.mapApi.image.pullPolicy }}
+          env:
+            - name: PORT
+              value: {{ .Values.mapApi.port | quote }}
+            - name: PG_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: PG_HOST
+            - name: PG_PORT
+              value: {{ .Values.mapApi.database.port | quote }}
+            - name: PG_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: PG_DATABASE
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: map-api-db-secret
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: map-api-db-secret
+                  key: password
+            - name: DATABASE_URL_SUFFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: DATABASE_URL_SUFFIX
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: KEYCLOAK_ISSUER
+            - name: KEYCLOAK_JWKS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: KEYCLOAK_JWKS_URL
+            - name: CORS_ALLOWED_ORIGINS
+              valueFrom:
+                configMapKeyRef:
+                  name: map-api-config
+                  key: CORS_ALLOWED_ORIGINS
+          ports:
+            - name: http
+              containerPort: {{ .Values.mapApi.port }}
+          readinessProbe:
+            httpGet:
+              path: /public/health/ready
+              port: {{ .Values.mapApi.port }}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /public/health/live
+              port: {{ .Values.mapApi.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.mapApi.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: map-api
+  labels:
+    app: map-api
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.mapApi.port }}
+      targetPort: {{ .Values.mapApi.port }}
+  selector:
+    app: map-api
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: map-api-config
+  labels:
+    app: map-api
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+data:
+  PG_HOST: {{ .Values.mapApi.database.host | quote }}
+  PG_DATABASE: {{ .Values.mapApi.database.name | quote }}
+  DATABASE_URL_SUFFIX: {{ .Values.mapApi.database.urlSuffix | quote }}
+  KEYCLOAK_ISSUER: {{ .Values.mapApi.keycloak.issuer | quote }}
+  KEYCLOAK_JWKS_URL: {{ .Values.mapApi.keycloak.jwksUrl | quote }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.mapApi.corsAllowedOrigins | quote }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: map-api-db-secret
+  labels:
+    app: map-api
+    {{- include "demoapp.commonLabels" . | nindent 4 }}
+type: Opaque
+stringData:
+  username: {{ .Values.mapApi.database.username | quote }}
+  password: {{ .Values.mapApi.database.password | quote }}

@@ -1,32 +1,30 @@
 #!/bin/bash
-# Install ingress-nginx controller (containerized) and apply DemoApp Ingress for local K8s.
-# Run from repository root. Keycloak must already be deployed.
+# Install ingress-nginx for the local DemoApp cluster with Helm.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-INGRESS_NGINX_URL="https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/baremetal/deploy.yaml"
+if ! command -v helm >/dev/null 2>&1; then
+  echo "Required command not found: helm"
+  exit 1
+fi
 
-echo "Installing ingress-nginx controller (bare metal / NodePort)..."
-kubectl apply -f "$INGRESS_NGINX_URL"
+echo "Configuring the ingress-nginx Helm repository..."
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
+helm repo update ingress-nginx >/dev/null
 
-echo "Waiting for ingress-nginx controller to be ready..."
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s 2>/dev/null || {
-  echo "Waiting for controller pods..."
-  sleep 10
-  kubectl get pods -n ingress-nginx
-}
-
-echo "Applying DemoApp Ingress (path /auth -> Keycloak)..."
-kubectl apply -f k8s/local/ingress.yaml
+echo "Installing ingress-nginx controller..."
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --set controller.service.type=NodePort \
+  --wait \
+  --timeout 5m
 
 echo ""
 echo "Local Ingress is ready."
-echo "Get the NodePort for HTTP: kubectl get svc -n ingress-nginx ingress-nginx-controller"
-echo "On Docker Desktop / Minikube you may be able to use port 80 if the controller got a LoadBalancer."
+echo "Port-forward ingress for a stable local URL:"
+echo "  kubectl port-forward -n ingress-nginx svc/ingress-nginx-controller 50594:80"

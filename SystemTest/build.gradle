@@ -1,0 +1,98 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    testcontainersVersion = '1.20.4'
+    cucumberVersion = '7.20.1'
+    junitVersion = '5.11.3'
+    playwrightVersion = '1.49.0'
+    jacksonVersion = '2.18.1'
+}
+
+dependencies {
+    // Bills of materials keep the related artifacts on consistent versions.
+    testImplementation platform("org.testcontainers:testcontainers-bom:${testcontainersVersion}")
+    testImplementation platform("io.cucumber:cucumber-bom:${cucumberVersion}")
+    testImplementation platform("org.junit:junit-bom:${junitVersion}")
+
+    // Testcontainers: spin up the whole stack from the dedicated :systemtest images.
+    testImplementation 'org.testcontainers:testcontainers'
+    testImplementation 'org.testcontainers:postgresql'
+
+    // Cucumber on the JUnit Platform, with PicoContainer for step/hook dependency injection.
+    testImplementation 'io.cucumber:cucumber-java'
+    testImplementation 'io.cucumber:cucumber-junit-platform-engine'
+    testImplementation 'io.cucumber:cucumber-picocontainer'
+
+    // JUnit Platform suite launcher used by RunCucumberTest, plus Jupiter assertions for steps.
+    testImplementation 'org.junit.platform:junit-platform-suite'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Browser automation and JSON handling.
+    testImplementation "com.microsoft.playwright:playwright:${playwrightVersion}"
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}"
+
+    // Simple SLF4J binding so Testcontainers/Playwright logs are visible.
+    testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+test {
+    useJUnitPlatform()
+    // These are integration tests against live containers whose state is not captured by Gradle's
+    // input/output tracking, so always re-run rather than reporting UP-TO-DATE from a cached run.
+    outputs.upToDateWhen { false }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+    // Allow filtering by Cucumber tags, e.g. ./gradlew test -Dcucumber.filter.tags="@api"
+    if (System.getProperty('cucumber.filter.tags') != null) {
+        systemProperty 'cucumber.filter.tags', System.getProperty('cucumber.filter.tags')
+    }
+    // Surface the chosen gateway port / image tag and the Docker environment to the test JVM.
+    // Testcontainers needs DOCKER_HOST (and, for non-standard daemons like Rancher Desktop, the
+    // socket override) to locate the engine; the launcher script derives these from the active
+    // docker context.
+    [
+        'SYSTEMTEST_GATEWAY_PORT',
+        'SYSTEMTEST_IMAGE_TAG',
+        'DOCKER_HOST',
+        'DOCKER_API_VERSION',
+        'DOCKER_TLS_VERIFY',
+        'DOCKER_CERT_PATH',
+        'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE',
+        'TESTCONTAINERS_RYUK_DISABLED'
+    ].each { key ->
+        if (System.getenv(key) != null) {
+            environment key, System.getenv(key)
+        }
+    }
+    // docker-java reads the API version from the 'api.version' system property, not from the
+    // DOCKER_API_VERSION env var; pin it so modern daemons (Colima, Rancher) do not reject the
+    // client's default 1.32.
+    if (System.getenv('DOCKER_API_VERSION') != null) {
+        systemProperty 'api.version', System.getenv('DOCKER_API_VERSION')
+    }
+}
+
+// Installs the Playwright browser binaries into the local Playwright cache.
+tasks.register('installPlaywright', JavaExec) {
+    group = 'playwright'
+    description = 'Download the Playwright browser binaries'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.microsoft.playwright.CLI'
+    args = ['install', 'chromium']
+}

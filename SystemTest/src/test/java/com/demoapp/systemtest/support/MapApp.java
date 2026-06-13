@@ -6,14 +6,13 @@ import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.AriaRole;
 
+import lombok.RequiredArgsConstructor;
+
 /** Page object encapsulating interactions with the Map Markers SPA and the Keycloak login form. */
+@RequiredArgsConstructor
 public class MapApp {
 
     private final Page page;
-
-    public MapApp(Page page) {
-        this.page = page;
-    }
 
     public void open() {
         page.navigate("/");

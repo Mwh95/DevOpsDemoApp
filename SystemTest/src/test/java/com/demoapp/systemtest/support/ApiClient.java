@@ -15,19 +15,19 @@ import java.util.Map;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 /** Thin REST client used by the {@code @api} step definitions and the UI clean-up hook. */
+@Slf4j
+@RequiredArgsConstructor
 public class ApiClient {
 
     private final String baseUrl;
     private final String tokenEndpoint;
-    private final HttpClient http;
+    private final HttpClient http =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
     private final ObjectMapper mapper = new ObjectMapper();
-
-    public ApiClient(String baseUrl, String tokenEndpoint) {
-        this.baseUrl = baseUrl;
-        this.tokenEndpoint = tokenEndpoint;
-        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
-    }
 
     /** Fetches an access token via the test realm's direct access (password) grant. */
     public String passwordGrantToken(String username, String password) {
@@ -90,16 +90,31 @@ public class ApiClient {
 
     private ApiResponse exchange(HttpRequest request) {
         HttpResponse<String> response = send(request);
-        JsonNode json = null;
         String body = response.body();
-        if (body != null && !body.isBlank()) {
-            try {
-                json = mapper.readTree(body);
-            } catch (Exception ignored) {
-                // Non-JSON body (e.g. plain-text auth errors); leave json null.
-            }
-        }
+        JsonNode json = parseJsonBody(request, response.statusCode(), body);
         return new ApiResponse(response.statusCode(), body, json);
+    }
+
+    /**
+     * Parses the response body as JSON, returning {@code null} when there is nothing to parse.
+     *
+     * <p>A non-JSON body is expected for error responses (e.g. plain-text 401/403/404 from the
+     * gateway or Keycloak), so those are left as {@code null} silently. For a successful (2xx)
+     * response, however, an unparseable body usually points at a real problem, so it is logged.
+     */
+    private JsonNode parseJsonBody(HttpRequest request, int statusCode, String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            return mapper.readTree(body);
+        } catch (Exception e) {
+            if (statusCode >= 200 && statusCode < 300) {
+                log.info("Expected a JSON body from {} {} (status {}) but could not parse it: {}",
+                        request.method(), request.uri(), statusCode, e.getMessage());
+            }
+            return null;
+        }
     }
 
     private HttpResponse<String> send(HttpRequest request) {

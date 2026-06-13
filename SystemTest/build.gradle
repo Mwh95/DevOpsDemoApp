@@ -12,6 +12,7 @@ ext {
     junitVersion = '5.11.3'
     playwrightVersion = '1.49.0'
     jacksonVersion = '2.18.1'
+    lombokVersion = '1.18.34'
 }
 
 dependencies {
@@ -40,6 +41,10 @@ dependencies {
 
     // Simple SLF4J binding so Testcontainers/Playwright logs are visible.
     testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.16'
+
+    // Lombok: @Slf4j logger and generated constructors for the support classes.
+    testCompileOnly "org.projectlombok:lombok:${lombokVersion}"
+    testAnnotationProcessor "org.projectlombok:lombok:${lombokVersion}"
 }
 
 java {

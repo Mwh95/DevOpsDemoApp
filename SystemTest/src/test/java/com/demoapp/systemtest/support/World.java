@@ -1,7 +1,7 @@
 package com.demoapp.systemtest.support;
 
 import com.demoapp.systemtest.env.TestEnvironment;
-import com.fasterxml.jackson.databind.JsonNode;
+import com.demoapp.systemtest.model.Marker;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
 
@@ -21,16 +21,16 @@ public class World {
     // API state
     public String token;
     public ApiResponse lastResponse;
-    public JsonNode createdMarker;
+    public Marker createdMarker;
 
     public String baseUrl() {
         return env.baseUrl();
     }
 
     public String createdMarkerId() {
-        if (createdMarker == null || createdMarker.get("id") == null) {
+        if (createdMarker == null || createdMarker.id() == null) {
             throw new IllegalStateException("No marker has been created in this scenario yet");
         }
-        return createdMarker.get("id").asText();
+        return createdMarker.id();
     }
 }

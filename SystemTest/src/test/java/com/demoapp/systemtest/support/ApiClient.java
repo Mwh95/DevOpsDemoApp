@@ -12,14 +12,11 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.demoapp.systemtest.model.TokenResponse;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 /** Thin REST client used by the {@code @api} step definitions and the UI clean-up hook. */
-@Slf4j
 @RequiredArgsConstructor
 public class ApiClient {
 
@@ -27,7 +24,6 @@ public class ApiClient {
     private final String tokenEndpoint;
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(20)).build();
-    private final ObjectMapper mapper = new ObjectMapper();
 
     /** Fetches an access token via the test realm's direct access (password) grant. */
     public String passwordGrantToken(String username, String password) {
@@ -47,11 +43,9 @@ public class ApiClient {
             throw new IllegalStateException(
                     "Token request failed (" + response.statusCode() + "): " + response.body());
         }
-        try {
-            return mapper.readTree(response.body()).get("access_token").asText();
-        } catch (Exception e) {
-            throw new IllegalStateException("Could not parse token response", e);
-        }
+        return new ApiResponse(response.statusCode(), response.body())
+                .as(TokenResponse.class)
+                .accessToken();
     }
 
     public ApiResponse get(String path, String token) {
@@ -90,31 +84,7 @@ public class ApiClient {
 
     private ApiResponse exchange(HttpRequest request) {
         HttpResponse<String> response = send(request);
-        String body = response.body();
-        JsonNode json = parseJsonBody(request, response.statusCode(), body);
-        return new ApiResponse(response.statusCode(), body, json);
-    }
-
-    /**
-     * Parses the response body as JSON, returning {@code null} when there is nothing to parse.
-     *
-     * <p>A non-JSON body is expected for error responses (e.g. plain-text 401/403/404 from the
-     * gateway or Keycloak), so those are left as {@code null} silently. For a successful (2xx)
-     * response, however, an unparseable body usually points at a real problem, so it is logged.
-     */
-    private JsonNode parseJsonBody(HttpRequest request, int statusCode, String body) {
-        if (body == null || body.isBlank()) {
-            return null;
-        }
-        try {
-            return mapper.readTree(body);
-        } catch (Exception e) {
-            if (statusCode >= 200 && statusCode < 300) {
-                log.info("Expected a JSON body from {} {} (status {}) but could not parse it: {}",
-                        request.method(), request.uri(), statusCode, e.getMessage());
-            }
-            return null;
-        }
+        return new ApiResponse(response.statusCode(), response.body());
     }
 
     private HttpResponse<String> send(HttpRequest request) {

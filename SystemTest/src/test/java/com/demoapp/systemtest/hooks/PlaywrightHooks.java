@@ -1,12 +1,12 @@
 package com.demoapp.systemtest.hooks;
 
+import com.demoapp.systemtest.model.Marker;
 import com.demoapp.systemtest.support.ApiResponse;
 import com.demoapp.systemtest.support.World;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserType;
 import com.microsoft.playwright.Page;
 import com.microsoft.playwright.Playwright;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import io.cucumber.java.After;
 import io.cucumber.java.Before;
@@ -59,10 +59,8 @@ public class PlaywrightHooks {
     private void clearMarkers() {
         String token = world.api.passwordGrantToken(UI_USER, UI_PASSWORD);
         ApiResponse list = world.api.get("/api/markers", token);
-        if (list.json() != null && list.json().isArray()) {
-            for (JsonNode marker : list.json()) {
-                world.api.delete("/api/markers/" + marker.get("id").asText(), token);
-            }
+        for (Marker marker : list.asListOf(Marker.class)) {
+            world.api.delete("/api/markers/" + marker.id(), token);
         }
     }
 

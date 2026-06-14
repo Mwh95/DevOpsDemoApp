@@ -22,9 +22,9 @@ import org.testcontainers.utility.MountableFile;
 public final class TestEnvironment {
 
     /** Fixed host port for the gateway; must match the redirect URIs in the realm export. */
-    public static final int GATEWAY_PORT = Integer.parseInt(env("SYSTEMTEST_GATEWAY_PORT", "58080"));
+    public static final int GATEWAY_PORT = Integer.parseInt(getSystemEnvVariable("SYSTEMTEST_GATEWAY_PORT", "58080"));
 
-    private static final String IMAGE_TAG = env("SYSTEMTEST_IMAGE_TAG", "systemtest");
+    private static final String IMAGE_TAG = getSystemEnvVariable("SYSTEMTEST_IMAGE_TAG", "systemtest");
 
     private static final String DB_NAME = "MapMarkerDb";
     private static final String REALM = "users";
@@ -70,7 +70,6 @@ public final class TestEnvironment {
         return issuer() + "/protocol/openid-connect/token";
     }
 
-    @SuppressWarnings("resource")
     private void start() {
         postgres = new PostgreSQLContainer<>(
                 DockerImageName.parse("postgres:18.2-trixie").asCompatibleSubstituteFor("postgres"))
@@ -177,7 +176,7 @@ public final class TestEnvironment {
         return DockerImageName.parse(repository + ":" + IMAGE_TAG);
     }
 
-    private static String env(String key, String fallback) {
+    private static String getSystemEnvVariable(String key, String fallback) {
         String value = System.getenv(key);
         return value != null && !value.isBlank() ? value : fallback;
     }

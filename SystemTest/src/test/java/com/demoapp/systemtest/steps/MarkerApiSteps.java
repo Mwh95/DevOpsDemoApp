@@ -4,9 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.demoapp.systemtest.support.ApiResponse;
+import java.util.List;
+
+import com.demoapp.systemtest.model.Marker;
 import com.demoapp.systemtest.support.World;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -44,7 +45,7 @@ public class MarkerApiSteps {
                 quote(label), quote(note));
         world.lastResponse = world.api.post("/api/markers", world.token, body);
         if (world.lastResponse.status() == 201) {
-            world.createdMarker = world.lastResponse.json();
+            world.createdMarker = world.lastResponse.as(Marker.class);
         }
     }
 
@@ -58,7 +59,7 @@ public class MarkerApiSteps {
         String body = String.format("{\"label\":%s}", quote(label));
         world.lastResponse = world.api.put("/api/markers/" + world.createdMarkerId(), world.token, body);
         if (world.lastResponse.status() == 200) {
-            world.createdMarker = world.lastResponse.json();
+            world.createdMarker = world.lastResponse.as(Marker.class);
         }
     }
 
@@ -93,20 +94,13 @@ public class MarkerApiSteps {
     @Then("the created marker has label {string}")
     public void theCreatedMarkerHasLabel(String label) {
         assertNotNull(world.createdMarker, "No created marker available");
-        assertEquals(label, world.createdMarker.get("label").asText());
+        assertEquals(label, world.createdMarker.label());
     }
 
     @Then("the marker list contains {string}")
     public void theMarkerListContains(String label) {
-        JsonNode list = world.lastResponse.json();
-        assertNotNull(list, "Marker list response was not JSON: " + world.lastResponse.body());
-        boolean found = false;
-        for (JsonNode marker : list) {
-            if (label.equals(marker.path("label").asText())) {
-                found = true;
-                break;
-            }
-        }
+        List<Marker> markers = world.lastResponse.asListOf(Marker.class);
+        boolean found = markers.stream().anyMatch(marker -> label.equals(marker.label()));
         assertTrue(found, "Marker list did not contain label '" + label + "': " + world.lastResponse.body());
     }
 
